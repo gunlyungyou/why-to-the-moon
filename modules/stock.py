@@ -1,7 +1,8 @@
 import re
 import requests
+import pandas as pd
 from bs4 import BeautifulSoup
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import FinanceDataReader as fdr
 
 NAVER_HEADERS = {
@@ -10,12 +11,40 @@ NAVER_HEADERS = {
     'Accept-Language': 'ko-KR,ko;q=0.9',
 }
 
+# 한국어 입력 → (FDR 심볼, 표시명, 통화)
+_OVERSEAS_INDEX_MAP: dict[str, tuple[str, str, str]] = {
+    # 미국
+    '나스닥': ('NASDAQ', '나스닥', 'USD'),
+    'nasdaq': ('NASDAQ', '나스닥', 'USD'),
+    's&p500': ('SP500', 'S&P500', 'USD'),
+    'sp500': ('SP500', 'S&P500', 'USD'),
+    '에스앤피': ('SP500', 'S&P500', 'USD'),
+    '다우': ('DJI', '다우존스', 'USD'),
+    '다우존스': ('DJI', '다우존스', 'USD'),
+    'dow': ('DJI', '다우존스', 'USD'),
+    # 일본
+    '니케이': ('^N225', '니케이225', 'JPY'),
+    '니케이225': ('^N225', '니케이225', 'JPY'),
+    'nikkei': ('^N225', '니케이225', 'JPY'),
+    # 홍콩
+    '항셍': ('^HSI', '항셍지수', 'HKD'),
+    '항생': ('^HSI', '항셍지수', 'HKD'),
+    'hsi': ('^HSI', '항셍지수', 'HKD'),
+    # 중국
+    '상해': ('SSE', '상해종합', 'CNY'),
+    '상해종합': ('SSE', '상해종합', 'CNY'),
+    # 유럽
+    '독일': ('^GDAXI', 'DAX', 'EUR'),
+    'dax': ('^GDAXI', 'DAX', 'EUR'),
+    '영국': ('^FTSE', 'FTSE100', 'GBP'),
+    'ftse': ('^FTSE', 'FTSE100', 'GBP'),
+}
+
 # 세션당 한 번만 다운로드
 _listing_cache: dict | None = None
 
 
 def _get_listing() -> dict:
-    """KRX 전체 종목 목록 (Code→row) - 세션 내 캐시."""
     global _listing_cache
     if _listing_cache is None:
         df = fdr.StockListing('KRX')
@@ -23,10 +52,18 @@ def _get_listing() -> dict:
     return _listing_cache
 
 
+def _lookup_overseas(name: str) -> tuple[str, str, str] | None:
+    return _OVERSEAS_INDEX_MAP.get(name.lower().strip().replace(' ', ''))
+
+
 def get_ticker_code(name: str) -> str:
-    """종목명 → 6자리 티커 코드. 이미 코드면 그대로 반환."""
+    """종목명 → 티커. 해외 지수면 FDR 심볼, KRX 종목이면 6자리 코드."""
     if re.match(r'^\d{6}$', name):
         return name
+
+    overseas = _lookup_overseas(name)
+    if overseas:
+        return overseas[0]  # FDR 심볼
 
     listing = _get_listing()
     for code, row in listing.items():
@@ -35,15 +72,23 @@ def get_ticker_code(name: str) -> str:
 
     raise ValueError(
         f"종목을 찾을 수 없습니다: '{name}'\n"
-        "힌트: 정확한 종목명(예: '삼성전자') 또는 6자리 코드(예: '005930')를 입력하세요."
+        "국내 종목은 정확한 종목명(예: 삼성전자) 또는 6자리 코드,\n"
+        "해외 지수는 '나스닥', '니케이', 'S&P500', '다우존스', '항셍' 등으로 입력하세요."
     )
 
 
 def get_price_info(ticker: str) -> dict:
-    """FinanceDataReader로 오늘 OHLCV 수집 후 장중 등락률(시가 기준) 계산."""
-    today = date.today().strftime('%Y-%m-%d')
+    overseas = next(
+        (v for k, v in _OVERSEAS_INDEX_MAP.items() if v[0] == ticker),
+        None,
+    )
+    if overseas:
+        return _get_index_price_info(*overseas)
+    return _get_stock_price_info(ticker)
 
-    # StockListing에서 오늘 데이터 추출
+
+def _get_stock_price_info(ticker: str) -> dict:
+    today = date.today().strftime('%Y-%m-%d')
     listing = _get_listing()
     row = listing.get(ticker, {})
     open_price = int(row['Open']) if row.get('Open') else None
@@ -53,7 +98,6 @@ def get_price_info(ticker: str) -> dict:
     volume = int(row['Volume']) if row.get('Volume') else None
     ticker_name = row.get('Name', '')
 
-    # DataReader로 보완 (StockListing 데이터가 비어있을 경우)
     if not current_price:
         try:
             df = fdr.DataReader(ticker, today, today)
@@ -67,7 +111,6 @@ def get_price_info(ticker: str) -> dict:
         except Exception:
             pass
 
-    # 시가 기준 장중 등락률 계산
     change_rate = None
     change_sign = ''
     change_amount = None
@@ -89,4 +132,51 @@ def get_price_info(ticker: str) -> dict:
         'change_sign': change_sign,
         'change_amount': change_amount,
         'as_of': datetime.now().strftime('%H:%M'),
+        'currency': 'KRW',
+        'is_index': False,
+    }
+
+
+def _get_index_price_info(symbol: str, display_name: str, currency: str) -> dict:
+    start = (date.today() - timedelta(days=10)).strftime('%Y-%m-%d')
+    end = date.today().strftime('%Y-%m-%d')
+
+    df = fdr.DataReader(symbol, start, end)
+    if df.empty:
+        raise ValueError(f"데이터를 가져올 수 없습니다: {display_name} ({symbol})")
+
+    latest = df.iloc[-1]
+    prev = df.iloc[-2] if len(df) >= 2 else None
+
+    def safe_float(val):
+        return float(val) if val is not None and not pd.isna(val) else None
+
+    current_price = safe_float(latest.get('Close'))
+    open_price = safe_float(latest.get('Open'))
+    prev_close = safe_float(prev['Close']) if prev is not None else None
+
+    change_rate = None
+    change_sign = ''
+    reference = prev_close or open_price
+    if current_price and reference and reference > 0:
+        diff = current_price - reference
+        change_rate = round(abs(diff) / reference * 100, 2)
+        change_sign = '+' if diff >= 0 else '-'
+
+    as_of = df.index[-1].strftime('%Y-%m-%d') if hasattr(df.index[-1], 'strftime') else str(df.index[-1])
+
+    return {
+        'ticker': symbol,
+        'ticker_name': display_name,
+        'current_price': current_price,
+        'open_price': open_price,
+        'high_price': safe_float(latest.get('High')),
+        'low_price': safe_float(latest.get('Low')),
+        'volume': None,
+        'change_rate': change_rate,
+        'change_sign': change_sign,
+        'change_amount': abs(current_price - reference) if current_price and reference else None,
+        'as_of': as_of,
+        'currency': currency,
+        'is_index': True,
     }

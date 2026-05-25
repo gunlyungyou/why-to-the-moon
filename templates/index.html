@@ -228,7 +228,11 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
 <script>
 let cursor = null;
 
-const fmt = v => typeof v === 'number' ? v.toLocaleString('ko-KR') + '원' : (v || 'N/A');
+function fmt(v, currency) {
+  if (typeof v !== 'number') return v || 'N/A';
+  if (!currency || currency === 'KRW') return v.toLocaleString('ko-KR') + '원';
+  return v.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + currency;
+}
 
 function timeAgo(s) {
   const diff = Math.floor((Date.now() - new Date(s.replace(' ', 'T'))) / 1000);
@@ -253,8 +257,8 @@ function showPrice(ticker, p) {
   const rateEl = document.getElementById('p-rate');
   rateEl.textContent = `${sign}${rate}%`;
   rateEl.className = 'price-rate ' + (sign === '+' ? 'up' : sign === '-' ? 'down' : 'flat');
-  document.getElementById('p-open').textContent = fmt(p.open_price);
-  document.getElementById('p-cur').textContent = fmt(p.current_price);
+  document.getElementById('p-open').textContent = fmt(p.open_price, p.currency);
+  document.getElementById('p-cur').textContent = fmt(p.current_price, p.currency);
   document.getElementById('p-time').textContent = p.as_of || '-';
   document.getElementById('price-card').classList.add('show');
 }

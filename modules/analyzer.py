@@ -24,8 +24,13 @@ def _build_user_message(ticker_name, price_info, news_items, disclosures=None):
     current_p = price_info.get('current_price')
     as_of = price_info.get('as_of', '현재')
 
-    open_str = f"{open_p:,}원" if isinstance(open_p, int) else '알 수 없음'
-    current_str = f"{current_p:,}원" if isinstance(current_p, int) else '알 수 없음'
+    currency = price_info.get('currency', 'KRW')
+    if currency == 'KRW':
+        open_str = f"{int(open_p):,}원" if open_p else '알 수 없음'
+        current_str = f"{int(current_p):,}원" if current_p else '알 수 없음'
+    else:
+        open_str = f"{open_p:,.2f} {currency}" if open_p else '알 수 없음'
+        current_str = f"{current_p:,.2f} {currency}" if current_p else '알 수 없음'
 
     news_lines = '\n'.join(
         f"- [{item.get('time', '')}] {item.get('title', '')} ({item.get('source', '')})"

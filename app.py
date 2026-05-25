@@ -11,7 +11,7 @@ import threading
 load_dotenv(Path(__file__).parent / '.env')
 
 from modules.stock import get_ticker_code, get_price_info
-from modules.news import get_naver_news
+from modules.news import get_naver_news, get_news_by_search
 from modules.analyzer import stream_price_movement
 
 app = FastAPI()
@@ -36,7 +36,10 @@ async def analyze(ticker_name: str):
             yield f"data: {json.dumps({'step': 'stock_done', 'ticker': ticker, 'price': price}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'step': 'news'}, ensure_ascii=False)}\n\n"
 
-            news = await asyncio.to_thread(get_naver_news, ticker, ticker_name, 10)
+            if price.get('is_index'):
+                news = await asyncio.to_thread(get_news_by_search, price.get('ticker_name', ticker_name), 10)
+            else:
+                news = await asyncio.to_thread(get_naver_news, ticker, ticker_name, 10)
 
             yield f"data: {json.dumps({'step': 'news_done', 'news': news}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'step': 'analyzing'}, ensure_ascii=False)}\n\n"

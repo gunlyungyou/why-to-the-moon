@@ -8,6 +8,11 @@ NAVER_HEADERS = {
     'Accept-Language': 'ko-KR,ko;q=0.9',
 }
 
+SEARCH_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept-Language': 'ko-KR,ko;q=0.9',
+}
+
 
 def get_naver_news(ticker: str, ticker_name: str = '', n: int = 10) -> list[dict]:
     """네이버 금융 종목 뉴스에서 최신 n건 수집."""
@@ -51,3 +56,32 @@ def get_naver_news(ticker: str, ticker_name: str = '', n: int = 10) -> list[dict
             time.sleep(0.5)  # robots.txt 준수
 
     return results[:n]
+
+
+def get_news_by_search(keyword: str, n: int = 10) -> list[dict]:
+    """네이버 뉴스 검색으로 최신 n건 수집 (해외 지수용)."""
+    url = 'https://search.naver.com/search.naver'
+    params = {'where': 'news', 'query': keyword, 'sort': '1'}
+    resp = requests.get(url, params=params, headers=SEARCH_HEADERS, timeout=10)
+    soup = BeautifulSoup(resp.text, 'html.parser')
+
+    results = []
+    for item in soup.select('div.news_wrap'):
+        title_el = item.select_one('a.news_tit')
+        press_el = item.select_one('a.info.press')
+        time_el = item.select_one('span.info')
+
+        if not title_el:
+            continue
+
+        results.append({
+            'title': title_el.get('title', '') or title_el.text.strip(),
+            'source': press_el.text.strip() if press_el else '',
+            'time': time_el.text.strip() if time_el else '',
+            'url': title_el.get('href', ''),
+        })
+
+        if len(results) >= n:
+            break
+
+    return results
