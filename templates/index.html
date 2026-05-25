@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StockAI — 주가 변동 분석기</title>
+<script src="https://unpkg.com/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 :root {
   --bg: #0d0d12;
@@ -14,7 +15,6 @@
   --muted: #6b6b85;
   --accent: #7c6af7;
   --accent2: #9d8fff;
-  --green: #4ade80;
   --red: #f87171;
   --blue: #60a5fa;
   --r: 14px;
@@ -146,23 +146,71 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
 .price-item label { display: block; font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
 .price-item span { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* Analysis */
-.analysis-body {
-  font-size: 0.93rem;
-  line-height: 1.75;
-  white-space: pre-wrap;
-  word-break: break-word;
+/* Analysis — headline */
+.analysis-headline {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
 }
-.cursor {
-  display: inline-block;
-  width: 2px;
-  height: 1em;
+
+/* Analysis — reason chips */
+.analysis-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.reason-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface2);
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+.reason-num {
+  width: 22px;
+  height: 22px;
   background: var(--accent);
-  vertical-align: text-bottom;
-  margin-left: 1px;
-  animation: blink 0.6s step-end infinite;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
 }
-@keyframes blink { 50% { opacity: 0; } }
+
+/* Analysis — detail toggle */
+.detail-toggle {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.15s;
+}
+.detail-toggle:hover { color: var(--text); }
+.analysis-detail {
+  display: none;
+  font-size: 0.9rem;
+  line-height: 1.75;
+  color: var(--muted);
+  padding-top: 12px;
+}
+.analysis-detail.open { display: block; }
+
+/* Chart */
+#chart-el { width: 100%; height: 260px; }
 
 /* News */
 .news-list { list-style: none; }
@@ -176,7 +224,6 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
 .news-time { font-size: 0.75rem; color: var(--muted); white-space: nowrap; min-width: 100px; padding-top: 2px; }
 .news-title { font-size: 0.88rem; line-height: 1.45; }
 .news-source { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
-
 </style>
 </head>
 <body>
@@ -191,7 +238,7 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
     <h2>주가 변동 분석기</h2>
     <p>종목명을 입력하면 최신 주가와 뉴스를 바탕으로 AI가 변동 원인을 분석합니다.</p>
     <form class="search-form" onsubmit="runAnalyze(event)">
-      <input id="q" type="text" placeholder="삼성전자, 카카오, SK하이닉스..." autocomplete="off" />
+      <input id="q" type="text" placeholder="삼성전자, 카카오, 니케이, 나스닥..." autocomplete="off" />
       <button type="submit" id="btn">분석하기</button>
     </form>
   </div>
@@ -213,20 +260,30 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
     </div>
   </div>
 
+  <div class="card" id="chart-card">
+    <div class="card-label">5분봉 차트 · <span id="chart-date"></span></div>
+    <div id="chart-el"></div>
+  </div>
+
   <div class="card" id="analysis-card">
     <div class="card-label">AI 분석</div>
-    <div class="analysis-body" id="a-text"></div>
+    <div class="analysis-headline" id="a-headline"></div>
+    <div class="analysis-reasons" id="a-reasons"></div>
+    <button class="detail-toggle" onclick="toggleDetail()">
+      상세 분석 <span id="toggle-icon">▼</span>
+    </button>
+    <div class="analysis-detail" id="a-detail"></div>
   </div>
 
   <div class="card" id="news-card">
     <div class="card-label">관련 뉴스</div>
     <ul class="news-list" id="n-list"></ul>
   </div>
-
 </main>
 
 <script>
-let cursor = null;
+const TZ_MAP = { KRW: 'Asia/Seoul', JPY: 'Asia/Tokyo', USD: 'America/New_York', HKD: 'Asia/Hong_Kong', CNY: 'Asia/Shanghai', EUR: 'Europe/Berlin', GBP: 'Europe/London' };
+let chartInstance = null;
 
 function fmt(v, currency) {
   if (typeof v !== 'number') return v || 'N/A';
@@ -234,19 +291,15 @@ function fmt(v, currency) {
   return v.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + currency;
 }
 
-function timeAgo(s) {
-  const diff = Math.floor((Date.now() - new Date(s.replace(' ', 'T'))) / 1000);
-  if (diff < 60) return '방금';
-  if (diff < 3600) return Math.floor(diff / 60) + '분 전';
-  if (diff < 86400) return Math.floor(diff / 3600) + '시간 전';
-  return Math.floor(diff / 86400) + '일 전';
-}
-
 function reset() {
-  ['price-card','analysis-card','news-card'].forEach(id => document.getElementById(id).classList.remove('show'));
+  ['price-card','chart-card','analysis-card','news-card'].forEach(id => document.getElementById(id).classList.remove('show'));
+  if (chartInstance) { chartInstance.remove(); chartInstance = null; }
   document.getElementById('err').classList.remove('show');
-  document.getElementById('a-text').innerHTML = '';
-  cursor = null;
+  document.getElementById('a-headline').textContent = '';
+  document.getElementById('a-reasons').innerHTML = '';
+  document.getElementById('a-detail').textContent = '';
+  document.getElementById('a-detail').classList.remove('open');
+  document.getElementById('toggle-icon').textContent = '▼';
 }
 
 function showPrice(ticker, p) {
@@ -263,6 +316,45 @@ function showPrice(ticker, p) {
   document.getElementById('price-card').classList.add('show');
 }
 
+function showChart(chartData, currency) {
+  if (!chartData || chartData.length === 0) return;
+  const el = document.getElementById('chart-el');
+  const tz = TZ_MAP[currency] || 'UTC';
+
+  const lastTs = chartData[chartData.length - 1].time;
+  document.getElementById('chart-date').textContent =
+    new Date(lastTs * 1000).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', timeZone: tz });
+
+  chartInstance = LightweightCharts.createChart(el, {
+    width: el.clientWidth,
+    height: 260,
+    layout: { background: { color: '#16161f' }, textColor: '#6b6b85' },
+    grid: { vertLines: { color: '#2a2a38' }, horzLines: { color: '#2a2a38' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: '#2a2a38' },
+    timeScale: {
+      borderColor: '#2a2a38',
+      timeVisible: true,
+      secondsVisible: false,
+      tickMarkFormatter: t =>
+        new Date(t * 1000).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: tz }),
+    },
+  });
+
+  const series = chartInstance.addCandlestickSeries({
+    upColor: '#f87171', downColor: '#60a5fa',
+    borderUpColor: '#f87171', borderDownColor: '#60a5fa',
+    wickUpColor: '#f87171', wickDownColor: '#60a5fa',
+  });
+  series.setData(chartData);
+  chartInstance.timeScale().fitContent();
+  document.getElementById('chart-card').classList.add('show');
+
+  window.addEventListener('resize', () => {
+    if (chartInstance) chartInstance.applyOptions({ width: el.clientWidth });
+  }, { once: true });
+}
+
 function showNews(news) {
   document.getElementById('n-list').innerHTML = news.map(n => `
     <li class="news-item">
@@ -273,6 +365,23 @@ function showNews(news) {
       </div>
     </li>`).join('');
   document.getElementById('news-card').classList.add('show');
+}
+
+function showAnalysis(result) {
+  document.getElementById('a-headline').textContent = result.headline || '';
+  document.getElementById('a-reasons').innerHTML = (result.reasons || []).map((r, i) => `
+    <div class="reason-item">
+      <span class="reason-num">${i + 1}</span>
+      <span>${r}</span>
+    </div>`).join('');
+  document.getElementById('a-detail').textContent = result.detail || '';
+  document.getElementById('analysis-card').classList.add('show');
+}
+
+function toggleDetail() {
+  const detail = document.getElementById('a-detail');
+  const icon = document.getElementById('toggle-icon');
+  icon.textContent = detail.classList.toggle('open') ? '▲' : '▼';
 }
 
 async function runAnalyze(e) {
@@ -301,50 +410,35 @@ async function runAnalyze(e) {
       for (const part of parts) {
         if (!part.startsWith('data: ')) continue;
         const d = JSON.parse(part.slice(6));
-        handleEvent(d, progText, prog);
+        if (d.step === 'stock') {
+          progText.textContent = '주가 데이터 수집 중...';
+        } else if (d.step === 'stock_done') {
+          showPrice(d.ticker, d.price);
+          showChart(d.chart, d.price.currency);
+        } else if (d.step === 'news') {
+          progText.textContent = '뉴스 수집 중...';
+        } else if (d.step === 'news_done') {
+          showNews(d.news);
+        } else if (d.step === 'analyzing') {
+          progText.textContent = 'Claude AI 분석 중...';
+        } else if (d.step === 'done') {
+          showAnalysis(d.result);
+          prog.classList.remove('show');
+        } else if (d.step === 'error') {
+          document.getElementById('err').textContent = '오류: ' + d.msg;
+          document.getElementById('err').classList.add('show');
+          prog.classList.remove('show');
+        }
       }
     }
   } catch (err) {
-    const el = document.getElementById('err');
-    el.textContent = '연결 오류: ' + err.message;
-    el.classList.add('show');
+    document.getElementById('err').textContent = '연결 오류: ' + err.message;
+    document.getElementById('err').classList.add('show');
     prog.classList.remove('show');
   }
 
   document.getElementById('btn').disabled = false;
 }
-
-function handleEvent(d, progText, prog) {
-  if (d.step === 'stock') {
-    progText.textContent = '주가 데이터 수집 중...';
-  } else if (d.step === 'stock_done') {
-    showPrice(d.ticker, d.price);
-  } else if (d.step === 'news') {
-    progText.textContent = '뉴스 수집 중...';
-  } else if (d.step === 'news_done') {
-    showNews(d.news);
-  } else if (d.step === 'analyzing') {
-    progText.textContent = 'Claude AI 분석 중...';
-    document.getElementById('analysis-card').classList.add('show');
-    cursor = document.createElement('span');
-    cursor.className = 'cursor';
-    document.getElementById('a-text').appendChild(cursor);
-  } else if (d.step === 'text') {
-    const el = document.getElementById('a-text');
-    if (cursor) cursor.remove();
-    el.insertAdjacentText('beforeend', d.text);
-    el.appendChild(cursor);
-  } else if (d.step === 'done') {
-    if (cursor) cursor.remove();
-    prog.classList.remove('show');
-  } else if (d.step === 'error') {
-    const el = document.getElementById('err');
-    el.textContent = '오류: ' + d.msg;
-    el.classList.add('show');
-    prog.classList.remove('show');
-  }
-}
-
 </script>
 </body>
 </html>

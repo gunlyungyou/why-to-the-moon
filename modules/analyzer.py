@@ -1,19 +1,25 @@
 import os
+import json
+import re
 import anthropic
 
 CLAUDE_MODEL = 'claude-sonnet-4-6'
 
-SYSTEM_PROMPT = """You are a Korean stock market expert. Always respond in Korean (한국어로만 답변하세요).
+SYSTEM_PROMPT = """당신은 한국 주식 시장 전문가입니다. 반드시 한국어로, 반드시 JSON 형식으로만 답변하세요.
 
-주어진 주가 데이터와 뉴스를 바탕으로 주가 변동 원인을 일반인도 이해할 수 있게 설명하세요.
+주어진 주가 데이터와 뉴스를 분석하고, 아래 JSON만 출력하세요 (마크다운 코드블록 없이):
 
-분석 시 다음 원칙을 따르세요:
-- 반드시 한국어로 답변
-- 주가 변동 시점과 뉴스 발생 시점의 연관성에 집중
-- 업종 전반보다 해당 종목 특유의 요인 우선
-- 3~5문장으로 간결하게
-- 불확실한 내용은 "~로 보입니다", "~가 영향을 미친 것으로 추정됩니다" 등으로 표현
-- 뉴스가 부족하면 시장 전반 흐름이나 섹터 이슈로 추론 가능 여부를 언급"""
+{
+  "headline": "핵심 원인 한 줄 (15자 이내, 예: '노사 갈등 → 투자심리 악화')",
+  "reasons": ["주요 원인 1 (20자 이내)", "주요 원인 2 (20자 이내)"],
+  "detail": "상세 설명 2~3문장."
+}
+
+원칙:
+- headline: 인과관계(→)로 핵심 원인 압축
+- reasons: 2~3개, 각 20자 이내의 구체적 원인
+- detail: 뉴스와 주가 변동의 연관성 중심, 불확실한 내용은 '~로 보입니다' 표현
+- 뉴스가 부족하면 시장 흐름 기반 추론 가능하나 불확실성 명시"""
 
 
 def _build_user_message(ticker_name, price_info, news_items, disclosures=None):
@@ -44,7 +50,7 @@ def _build_user_message(ticker_name, price_info, news_items, disclosures=None):
         )
 
     return (
-        f"{ticker_name}이(가) 오늘 9:00 시가({open_str})부터 "
+        f"{ticker_name}이(가) 오늘 시가({open_str})부터 "
         f"{as_of} 현재({current_str})까지 {sign}{rate}% {direction}했습니다.\n\n"
         f"관련 뉴스:\n{news_lines}"
         f"{disclosure_lines}\n\n"
@@ -52,7 +58,7 @@ def _build_user_message(ticker_name, price_info, news_items, disclosures=None):
     )
 
 
-def explain_price_movement(ticker_name, price_info, news_items, disclosures=None):
+def explain_price_movement(ticker_name, price_info, news_items, disclosures=None) -> dict:
     user_message = _build_user_message(ticker_name, price_info, news_items, disclosures)
     client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
     response = client.messages.create(
@@ -61,17 +67,12 @@ def explain_price_movement(ticker_name, price_info, news_items, disclosures=None
         system=SYSTEM_PROMPT,
         messages=[{'role': 'user', 'content': user_message}],
     )
-    return response.content[0].text
 
+    raw = response.content[0].text.strip()
+    raw = re.sub(r'^```(?:json)?\s*', '', raw)
+    raw = re.sub(r'\s*```$', '', raw)
 
-def stream_price_movement(ticker_name, price_info, news_items, disclosures=None):
-    user_message = _build_user_message(ticker_name, price_info, news_items, disclosures)
-    client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
-    with client.messages.stream(
-        model=CLAUDE_MODEL,
-        max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=[{'role': 'user', 'content': user_message}],
-    ) as stream:
-        for text in stream.text_stream:
-            yield text
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {'headline': '분석 완료', 'reasons': [], 'detail': raw}

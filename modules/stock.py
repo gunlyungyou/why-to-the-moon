@@ -1,6 +1,7 @@
 import re
 import requests
 import pandas as pd
+import yfinance as yf
 from bs4 import BeautifulSoup
 from datetime import date, datetime, timedelta
 import FinanceDataReader as fdr
@@ -9,6 +10,29 @@ NAVER_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Referer': 'https://finance.naver.com',
     'Accept-Language': 'ko-KR,ko;q=0.9',
+}
+
+# FDR 심볼 → yfinance 심볼
+_FDR_TO_YF: dict[str, str] = {
+    'NASDAQ': '^IXIC',
+    'SP500': '^GSPC',
+    'DJI': '^DJI',
+    '^N225': '^N225',
+    '^HSI': '^HSI',
+    'SSE': '000001.SS',
+    '^GDAXI': '^GDAXI',
+    '^FTSE': '^FTSE',
+}
+
+# 통화 → 시장 타임존
+_CURRENCY_TZ: dict[str, str] = {
+    'KRW': 'Asia/Seoul',
+    'JPY': 'Asia/Tokyo',
+    'USD': 'America/New_York',
+    'HKD': 'Asia/Hong_Kong',
+    'CNY': 'Asia/Shanghai',
+    'EUR': 'Europe/Berlin',
+    'GBP': 'Europe/London',
 }
 
 # 한국어 입력 → (FDR 심볼, 표시명, 통화)
@@ -180,3 +204,45 @@ def _get_index_price_info(symbol: str, display_name: str, currency: str) -> dict
         'currency': currency,
         'is_index': True,
     }
+
+
+def is_overseas_index_ticker(ticker: str) -> bool:
+    return any(v[0] == ticker for v in _OVERSEAS_INDEX_MAP.values())
+
+
+def get_chart_data(ticker: str, is_index: bool = False) -> list[dict]:
+    """5분봉 데이터 반환. 오늘 데이터 없으면 가장 최근 거래일 기준."""
+    if is_index:
+        yf_symbol = _FDR_TO_YF.get(ticker, ticker)
+    else:
+        listing = _get_listing()
+        market = listing.get(ticker, {}).get('Market', 'KOSPI')
+        yf_symbol = ticker + ('.KQ' if market == 'KOSDAQ' else '.KS')
+
+    try:
+        tk = yf.Ticker(yf_symbol)
+        df = tk.history(period='5d', interval='5m', auto_adjust=True)
+        if df.empty:
+            return []
+
+        if df.index.tz:
+            df.index = df.index.tz_convert('UTC')
+        else:
+            df.index = df.index.tz_localize('UTC')
+
+        last_date = df.index[-1].date()
+        df = df[df.index.date == last_date]
+
+        return [
+            {
+                'time': int(row.Index.timestamp()),
+                'open': round(float(row.Open), 4),
+                'high': round(float(row.High), 4),
+                'low': round(float(row.Low), 4),
+                'close': round(float(row.Close), 4),
+            }
+            for row in df.itertuples()
+            if not any(pd.isna(v) for v in [row.Open, row.High, row.Low, row.Close])
+        ]
+    except Exception:
+        return []
