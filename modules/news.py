@@ -59,29 +59,27 @@ def get_naver_news(ticker: str, ticker_name: str = '', n: int = 10) -> list[dict
 
 
 def get_news_by_search(keyword: str, n: int = 10) -> list[dict]:
-    """네이버 뉴스 검색으로 최신 n건 수집 (해외 지수용)."""
-    url = 'https://search.naver.com/search.naver'
-    params = {'where': 'news', 'query': keyword, 'sort': '1'}
+    """Google News RSS로 최신 n건 수집 (해외 지수용)."""
+    url = 'https://news.google.com/rss/search'
+    params = {'q': keyword, 'hl': 'ko', 'gl': 'KR', 'ceid': 'KR:ko'}
     resp = requests.get(url, params=params, headers=SEARCH_HEADERS, timeout=10)
-    soup = BeautifulSoup(resp.text, 'html.parser')
+    soup = BeautifulSoup(resp.text, 'xml')
 
     results = []
-    for item in soup.select('div.news_wrap'):
-        title_el = item.select_one('a.news_tit')
-        press_el = item.select_one('a.info.press')
-        time_el = item.select_one('span.info')
+    for item in soup.find_all('item')[:n]:
+        title = item.find('title')
+        source = item.find('source')
+        pub_date = item.find('pubDate')
+        link = item.find('link')
 
-        if not title_el:
+        if not title:
             continue
 
         results.append({
-            'title': title_el.get('title', '') or title_el.text.strip(),
-            'source': press_el.text.strip() if press_el else '',
-            'time': time_el.text.strip() if time_el else '',
-            'url': title_el.get('href', ''),
+            'title': title.text.strip(),
+            'source': source.text.strip() if source else '',
+            'time': pub_date.text.strip() if pub_date else '',
+            'url': link.text.strip() if link else '',
         })
-
-        if len(results) >= n:
-            break
 
     return results
