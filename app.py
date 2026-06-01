@@ -9,7 +9,7 @@ import asyncio
 
 load_dotenv(Path(__file__).parent / '.env')
 
-from modules.stock import get_ticker_code, get_price_info, get_chart_data, is_overseas_index_ticker
+from modules.stock import get_ticker_code, get_price_info, get_chart_data, is_overseas_index_ticker, get_market_context, get_surging_popular_stocks
 from modules.news import get_naver_news, get_news_by_search
 from modules.analyzer import explain_price_movement
 
@@ -22,6 +22,12 @@ async def index(request: Request):
     return templates.TemplateResponse(request, "index.html")
 
 
+@app.get("/api/popular")
+async def popular():
+    data = await asyncio.to_thread(get_surging_popular_stocks, 10)
+    return data
+
+
 @app.get("/api/analyze")
 async def analyze(ticker_name: str):
     async def generate():
@@ -29,9 +35,10 @@ async def analyze(ticker_name: str):
             yield f"data: {json.dumps({'step': 'stock'}, ensure_ascii=False)}\n\n"
             ticker = await asyncio.to_thread(get_ticker_code, ticker_name)
             is_index = is_overseas_index_ticker(ticker)
-            price, chart = await asyncio.gather(
+            price, chart, mkt_ctx = await asyncio.gather(
                 asyncio.to_thread(get_price_info, ticker),
                 asyncio.to_thread(get_chart_data, ticker, is_index),
+                asyncio.to_thread(get_market_context, ticker, 'KRW' if not is_index else 'USD'),
             )
             yield f"data: {json.dumps({'step': 'stock_done', 'ticker': ticker, 'price': price, 'chart': chart}, ensure_ascii=False)}\n\n"
 
@@ -43,7 +50,7 @@ async def analyze(ticker_name: str):
             yield f"data: {json.dumps({'step': 'news_done', 'news': news}, ensure_ascii=False)}\n\n"
 
             yield f"data: {json.dumps({'step': 'analyzing'}, ensure_ascii=False)}\n\n"
-            result = await asyncio.to_thread(explain_price_movement, ticker_name, price, news)
+            result = await asyncio.to_thread(explain_price_movement, ticker_name, price, news, chart, None, mkt_ctx)
             yield f"data: {json.dumps({'step': 'done', 'result': result}, ensure_ascii=False)}\n\n"
 
         except Exception as e:

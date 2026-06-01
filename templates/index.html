@@ -78,6 +78,52 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
 .search-form button:hover { opacity: 0.85; }
 .search-form button:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Popular surging stocks */
+.popular-section { margin-bottom: 32px; }
+.popular-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+}
+.popular-live {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34,197,94,0.4);
+  animation: live-pulse 2s infinite;
+}
+@keyframes live-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+  70%  { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+.popular-title { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+.popular-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+@media (max-width: 540px) { .popular-grid { grid-template-columns: repeat(2, 1fr); } }
+.popular-card {
+  padding: 11px 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+  min-width: 0;
+}
+.popular-card:hover { border-color: var(--accent); background: var(--surface2); }
+.popular-rank { font-size: 0.62rem; color: var(--muted); margin-bottom: 4px; }
+.popular-name {
+  font-size: 0.83rem; font-weight: 600; margin-bottom: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.popular-price { font-size: 0.72rem; color: var(--muted); margin-bottom: 2px; }
+.popular-rate { font-size: 0.82rem; font-weight: 700; }
+.popular-skeleton {
+  height: 80px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; animation: sk-pulse 1.4s ease-in-out infinite;
+}
+@keyframes sk-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.9; } }
+
 /* Progress */
 .progress {
   display: none;
@@ -134,17 +180,16 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
   margin-bottom: 14px;
 }
 
-/* Price card */
-.price-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+/* Price + Chart unified card */
+.pc-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
 .price-name { font-size: 1.3rem; font-weight: 700; }
 .price-code { font-size: 0.85rem; color: var(--muted); }
 .price-rate { margin-left: auto; font-size: 1.1rem; font-weight: 700; }
 .up { color: var(--red); }
 .down { color: var(--blue); }
 .flat { color: var(--muted); }
-.price-row { display: flex; gap: 32px; flex-wrap: wrap; }
-.price-item label { display: block; font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
-.price-item span { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pc-sub { display: flex; gap: 20px; font-size: 0.82rem; color: var(--muted); margin-bottom: 16px; flex-wrap: wrap; }
+.pc-sub strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* Analysis — headline */
 .analysis-headline {
@@ -156,35 +201,30 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
   border-bottom: 1px solid var(--border);
 }
 
-/* Analysis — reason chips */
-.analysis-reasons {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.reason-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+/* Analysis — phases */
+.analysis-phases { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.phase-item {
+  padding: 13px 16px;
   background: var(--surface2);
   border-radius: 10px;
-  font-size: 0.9rem;
 }
-.reason-num {
-  width: 22px;
-  height: 22px;
-  background: var(--accent);
-  color: #fff;
+.phase-header { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+.phase-icon {
+  width: 20px; height: 20px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  font-weight: 700;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 700; flex-shrink: 0;
 }
+.phase-icon.up   { background: rgba(248,113,113,0.15); color: var(--red); }
+.phase-icon.down { background: rgba(96,165,250,0.15);  color: var(--blue); }
+.phase-icon.flat { background: rgba(107,107,133,0.15); color: var(--muted); }
+.phase-label { font-size: 0.88rem; font-weight: 600; }
+.phase-label.up   { color: var(--red); }
+.phase-label.down { color: var(--blue); }
+.phase-label.flat { color: var(--muted); }
+.phase-time   { font-size: 0.75rem; color: var(--muted); }
+.phase-change { margin-left: auto; font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.phase-reason { font-size: 0.84rem; color: var(--muted); line-height: 1.45; padding-left: 29px; }
 
 /* Analysis — detail toggle */
 .detail-toggle {
@@ -243,32 +283,42 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
     </form>
   </div>
 
+  <!-- 급등 인기 종목 -->
+  <div class="popular-section" id="popular-section">
+    <div class="popular-header">
+      <div class="popular-live"></div>
+      <span class="popular-title">급등 인기 종목</span>
+    </div>
+    <div class="popular-grid" id="popular-grid">
+      <div class="popular-skeleton"></div><div class="popular-skeleton"></div>
+      <div class="popular-skeleton"></div><div class="popular-skeleton"></div>
+      <div class="popular-skeleton"></div><div class="popular-skeleton"></div>
+      <div class="popular-skeleton"></div><div class="popular-skeleton"></div>
+      <div class="popular-skeleton"></div><div class="popular-skeleton"></div>
+    </div>
+  </div>
+
   <div class="error-box" id="err"></div>
   <div class="progress" id="prog"><div class="spinner"></div><span id="prog-text">준비 중...</span></div>
 
   <div class="card" id="price-card">
-    <div class="card-label">시세</div>
-    <div class="price-header">
+    <div class="pc-header">
       <span class="price-name" id="p-name"></span>
       <span class="price-code" id="p-code"></span>
       <span class="price-rate" id="p-rate"></span>
     </div>
-    <div class="price-row">
-      <div class="price-item"><label>시가</label><span id="p-open"></span></div>
-      <div class="price-item"><label>현재가</label><span id="p-cur"></span></div>
-      <div class="price-item"><label>기준 시각</label><span id="p-time"></span></div>
+    <div class="pc-sub">
+      <span>시가 <strong id="p-open"></strong></span>
+      <span>현재가 <strong id="p-cur"></strong></span>
+      <span id="p-time"></span>
     </div>
-  </div>
-
-  <div class="card" id="chart-card">
-    <div class="card-label">5분봉 차트 · <span id="chart-date"></span></div>
     <div id="chart-el"></div>
   </div>
 
   <div class="card" id="analysis-card">
     <div class="card-label">AI 분석</div>
     <div class="analysis-headline" id="a-headline"></div>
-    <div class="analysis-reasons" id="a-reasons"></div>
+    <div class="analysis-phases" id="a-phases"></div>
     <button class="detail-toggle" onclick="toggleDetail()">
       상세 분석 <span id="toggle-icon">▼</span>
     </button>
@@ -292,11 +342,11 @@ function fmt(v, currency) {
 }
 
 function reset() {
-  ['price-card','chart-card','analysis-card','news-card'].forEach(id => document.getElementById(id).classList.remove('show'));
+  ['price-card','analysis-card','news-card'].forEach(id => document.getElementById(id).classList.remove('show'));
   if (chartInstance) { chartInstance.remove(); chartInstance = null; }
   document.getElementById('err').classList.remove('show');
   document.getElementById('a-headline').textContent = '';
-  document.getElementById('a-reasons').innerHTML = '';
+  document.getElementById('a-phases').innerHTML = '';
   document.getElementById('a-detail').textContent = '';
   document.getElementById('a-detail').classList.remove('open');
   document.getElementById('toggle-icon').textContent = '▼';
@@ -316,17 +366,18 @@ function showPrice(ticker, p) {
   document.getElementById('price-card').classList.add('show');
 }
 
-function showChart(chartData, currency) {
+async function showChart(chartData, currency) {
   if (!chartData || chartData.length === 0) return;
-  const el = document.getElementById('chart-el');
   const tz = TZ_MAP[currency] || 'UTC';
+  const el = document.getElementById('chart-el');
 
-  const lastTs = chartData[chartData.length - 1].time;
-  document.getElementById('chart-date').textContent =
-    new Date(lastTs * 1000).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', timeZone: tz });
+  // 카드가 이미 show 상태 + 브라우저 레이아웃 완료 대기
+  await new Promise(resolve => requestAnimationFrame(resolve));
+
+  if (chartInstance) { chartInstance.remove(); chartInstance = null; }
 
   chartInstance = LightweightCharts.createChart(el, {
-    width: el.clientWidth,
+    autoSize: true,
     height: 260,
     layout: { background: { color: '#16161f' }, textColor: '#6b6b85' },
     grid: { vertLines: { color: '#2a2a38' }, horzLines: { color: '#2a2a38' } },
@@ -348,11 +399,6 @@ function showChart(chartData, currency) {
   });
   series.setData(chartData);
   chartInstance.timeScale().fitContent();
-  document.getElementById('chart-card').classList.add('show');
-
-  window.addEventListener('resize', () => {
-    if (chartInstance) chartInstance.applyOptions({ width: el.clientWidth });
-  }, { once: true });
 }
 
 function showNews(news) {
@@ -369,11 +415,24 @@ function showNews(news) {
 
 function showAnalysis(result) {
   document.getElementById('a-headline').textContent = result.headline || '';
-  document.getElementById('a-reasons').innerHTML = (result.reasons || []).map((r, i) => `
-    <div class="reason-item">
-      <span class="reason-num">${i + 1}</span>
-      <span>${r}</span>
-    </div>`).join('');
+
+  document.getElementById('a-phases').innerHTML = (result.phases || []).map(p => {
+    const isUp   = p.change?.startsWith('+');
+    const isDown = p.change?.startsWith('-');
+    const cls    = isUp ? 'up' : isDown ? 'down' : 'flat';
+    const icon   = isUp ? '▲' : isDown ? '▼' : '─';
+    return `
+      <div class="phase-item">
+        <div class="phase-header">
+          <span class="phase-icon ${cls}">${icon}</span>
+          <span class="phase-label ${cls}">${p.label || ''}</span>
+          <span class="phase-time">${p.time || ''}</span>
+          <span class="phase-change ${cls}">${p.change || ''}</span>
+        </div>
+        <div class="phase-reason">${p.reason || ''}</div>
+      </div>`;
+  }).join('');
+
   document.getElementById('a-detail').textContent = result.detail || '';
   document.getElementById('analysis-card').classList.add('show');
 }
@@ -383,6 +442,37 @@ function toggleDetail() {
   const icon = document.getElementById('toggle-icon');
   icon.textContent = detail.classList.toggle('open') ? '▲' : '▼';
 }
+
+async function loadPopular() {
+  try {
+    const res = await fetch('/api/popular');
+    const data = await res.json();
+    const grid = document.getElementById('popular-grid');
+    if (!data || !data.length) {
+      document.getElementById('popular-section').style.display = 'none';
+      return;
+    }
+    grid.innerHTML = data.map(s => {
+      const cls = s.change_sign === '+' ? 'up' : s.change_sign === '-' ? 'down' : 'flat';
+      const price = s.current_price ? s.current_price.toLocaleString('ko-KR') + '원' : '-';
+      return `<div class="popular-card" onclick="pickPopular('${s.name}')">
+        <div class="popular-rank">${s.rank}위</div>
+        <div class="popular-name" title="${s.name}">${s.name}</div>
+        <div class="popular-price">${price}</div>
+        <div class="popular-rate ${cls}">${s.change_sign}${s.change_rate}%</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('popular-section').style.display = 'none';
+  }
+}
+
+function pickPopular(name) {
+  document.getElementById('q').value = name;
+  document.querySelector('.search-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+}
+
+document.addEventListener('DOMContentLoaded', loadPopular);
 
 async function runAnalyze(e) {
   e.preventDefault();
@@ -414,7 +504,7 @@ async function runAnalyze(e) {
           progText.textContent = '주가 데이터 수집 중...';
         } else if (d.step === 'stock_done') {
           showPrice(d.ticker, d.price);
-          showChart(d.chart, d.price.currency);
+          await showChart(d.chart, d.price.currency);
         } else if (d.step === 'news') {
           progText.textContent = '뉴스 수집 중...';
         } else if (d.step === 'news_done') {

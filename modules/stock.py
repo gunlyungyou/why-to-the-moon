@@ -1,4 +1,5 @@
 import re
+import time
 import requests
 import pandas as pd
 import yfinance as yf
@@ -206,8 +207,183 @@ def _get_index_price_info(symbol: str, display_name: str, currency: str) -> dict
     }
 
 
+def describe_chart_pattern(chart_data: list[dict], currency: str = 'KRW') -> str:
+    """5분봉 데이터를 Claude가 읽을 수 있는 장중 흐름 텍스트로 변환."""
+    if not chart_data or len(chart_data) < 3:
+        return ""
+
+    from zoneinfo import ZoneInfo
+    from datetime import datetime
+
+    tz = ZoneInfo(_CURRENCY_TZ.get(currency, 'Asia/Seoul'))
+
+    def fmt_t(ts):
+        return datetime.fromtimestamp(ts, tz=tz).strftime('%H:%M')
+
+    open_p = chart_data[0]['open']
+    def pct(p):
+        return (p - open_p) / open_p * 100 if open_p else 0
+
+    n = len(chart_data)
+    pcts = [pct(c['close']) for c in chart_data]
+
+    max_c = max(chart_data, key=lambda c: c['high'])
+    min_c = min(chart_data, key=lambda c: c['low'])
+
+    # 시간대별 누적 변동 (4개 체크포인트)
+    checkpoints = [n // 4, n // 2, 3 * n // 4, n - 1]
+    cp_str = ' → '.join(
+        f"{fmt_t(chart_data[i]['time'])} {pcts[i]:+.2f}%"
+        for i in checkpoints if i < n
+    )
+
+    return (
+        f"[장중 차트 흐름] {fmt_t(chart_data[0]['time'])} ~ {fmt_t(chart_data[-1]['time'])}\n"
+        f"  장중 최고: 시가 대비 {pct(max_c['high']):+.2f}% ({fmt_t(max_c['time'])})\n"
+        f"  장중 최저: 시가 대비 {pct(min_c['low']):+.2f}% ({fmt_t(min_c['time'])})\n"
+        f"  현재: 시가 대비 {pct(chart_data[-1]['close']):+.2f}%\n"
+        f"  누적 변동 추이: {cp_str}"
+    )
+
+
 def is_overseas_index_ticker(ticker: str) -> bool:
     return any(v[0] == ticker for v in _OVERSEAS_INDEX_MAP.values())
+
+
+def get_market_context(ticker: str, currency: str = 'KRW') -> dict:
+    """최근 5거래일 평균 변동률(변동성) + 오늘 시장 지수 수익률 반환."""
+    result = {'avg_daily_pct': None, 'market_index_pct': None, 'market_index_name': None}
+    today = date.today().strftime('%Y-%m-%d')
+    start = (date.today() - timedelta(days=14)).strftime('%Y-%m-%d')
+
+    try:
+        if is_overseas_index_ticker(ticker):
+            df = fdr.DataReader(ticker, start, today)
+        else:
+            df = fdr.DataReader(ticker, start, today)
+
+        if len(df) >= 2:
+            closes = df['Close'].dropna()
+            daily_pcts = closes.pct_change().dropna().abs() * 100
+            result['avg_daily_pct'] = round(float(daily_pcts.tail(5).mean()), 2)
+    except Exception:
+        pass
+
+    if currency == 'KRW' and not is_overseas_index_ticker(ticker):
+        try:
+            df_kospi = fdr.DataReader('KS11', start, today)
+            if len(df_kospi) >= 2:
+                latest = float(df_kospi['Close'].iloc[-1])
+                prev = float(df_kospi['Close'].iloc[-2])
+                result['market_index_pct'] = round((latest - prev) / prev * 100, 2)
+                result['market_index_name'] = 'KOSPI'
+        except Exception:
+            pass
+
+    return result
+
+
+_popular_cache: list | None = None
+_popular_cache_ts: float = 0
+_POPULAR_TTL = 600  # 10분
+
+
+def _get_naver_popular_codes(n: int = 50) -> list[str]:
+    """네이버 금융 인기 검색 종목 코드 반환."""
+    url = 'https://finance.naver.com/sise/lastsearch2.nhn'
+    resp = requests.get(url, headers=NAVER_HEADERS, timeout=6)
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    table = soup.find('table', class_='type_5')
+    if not table:
+        return []
+    codes = []
+    for row in table.find_all('tr'):
+        cols = row.find_all('td')
+        name_el = cols[1].find('a') if len(cols) > 1 else None
+        if not name_el:
+            continue
+        m = re.search(r'code=(\d{6})', name_el.get('href', ''))
+        if m:
+            codes.append(m.group(1))
+        if len(codes) >= n:
+            break
+    return codes
+
+
+def get_surging_popular_stocks(limit: int = 10) -> list[dict]:
+    """시가총액 상위 150개 ∩ 네이버 인기 검색 → 오늘 급등 순 정렬 (5분 캐시)."""
+    global _popular_cache, _popular_cache_ts
+
+    if _popular_cache is not None and time.time() - _popular_cache_ts < _POPULAR_TTL:
+        return _popular_cache[:limit]
+
+    try:
+        # 1) 네이버 인기 검색 코드 집합 (최근 7일 많이 오르내린 종목들)
+        popular_set = set(_get_naver_popular_codes(50))
+        if not popular_set:
+            return _popular_cache[:limit] if _popular_cache else []
+
+        # 2) KRX 전체 → KOSPI 시장만 + 시가총액 상위 80개
+        #    (KOSDAQ 소형 테마주 제외, 일시적 급등으로 시가총액 부풀어도 못 들어옴)
+        listing = _get_listing()
+        kospi_stocks = [
+            (code, row) for code, row in listing.items()
+            if row.get('Market') == 'KOSPI' and (row.get('Marcap') or 0) > 0
+        ]
+        sorted_by_marcap = sorted(kospi_stocks, key=lambda x: x[1].get('Marcap', 0), reverse=True)
+
+        # 3) 교집합: 인기 검색 AND KOSPI 상위 80개
+        candidates_codes = [code for code, _ in sorted_by_marcap[:80] if code in popular_set]
+
+        # 80 안에 5개 미만이면 150까지 확장
+        if len(candidates_codes) < 5:
+            candidates_codes = [code for code, _ in sorted_by_marcap[:150] if code in popular_set]
+
+        # 4) 후보 목록 구성
+        naver_rank = {code: i for i, code in enumerate(candidates_codes)}
+
+        pool = []
+        for code in candidates_codes:
+            row = listing.get(code, {})
+            change_ratio = row.get('ChagesRatio')
+            marcap = float(row.get('Marcap') or 0)
+            if change_ratio is None:
+                continue
+            change_ratio = float(change_ratio)
+            close = row.get('Close')
+            pool.append({
+                'rank': 0,
+                'name': row.get('Name', ''),
+                'code': code,
+                'current_price': int(close) if close else None,
+                'change_rate': round(abs(change_ratio), 2),
+                'change_sign': '+' if change_ratio > 0 else ('-' if change_ratio < 0 else ''),
+                '_ratio': change_ratio,
+                '_marcap': marcap,
+                '_naver_rank': naver_rank.get(code, 999),
+            })
+
+        # 상위 5: Naver 인기 순위 순 (오늘 상승 종목 우선)
+        by_naver = sorted(pool, key=lambda x: (x['_ratio'] <= 0, x['_naver_rank']))
+        top5 = by_naver[:5]
+        top5_codes = {c['code'] for c in top5}
+
+        # 하위 5: 나머지 중 시가총액 × 등락률 가중 점수 순
+        rest = [c for c in pool if c['code'] not in top5_codes]
+        rest.sort(key=lambda x: x['_ratio'] * x['_marcap'], reverse=True)
+        next5 = rest[:5]
+
+        candidates = top5 + next5
+        for i, c in enumerate(candidates):
+            c['rank'] = i + 1
+            del c['_ratio'], c['_marcap'], c['_naver_rank']
+
+        _popular_cache = candidates
+        _popular_cache_ts = time.time()
+        return candidates[:limit]
+
+    except Exception:
+        return _popular_cache[:limit] if _popular_cache else []
 
 
 def get_chart_data(ticker: str, is_index: bool = False) -> list[dict]:
