@@ -67,7 +67,7 @@ _OVERSEAS_INDEX_MAP: dict[str, tuple[str, str, str]] = {
 
 _listing_cache: dict | None = None
 _listing_cache_ts: float = 0
-_LISTING_TTL = 1800  # 30분마다 갱신 (등락률 최신화)
+_LISTING_TTL = 1800  # 요청 기반 폴백용 TTL (백그라운드 갱신이 주 경로)
 
 
 def _get_listing() -> dict:
@@ -77,6 +77,14 @@ def _get_listing() -> dict:
         _listing_cache = df.set_index('Code').to_dict(orient='index')
         _listing_cache_ts = time.time()
     return _listing_cache
+
+
+def refresh_market_data() -> None:
+    """백그라운드 스케줄러에서 호출 — 리스팅·인기 종목 캐시 강제 갱신."""
+    global _listing_cache_ts, _popular_cache_ts
+    _listing_cache_ts = 0   # TTL 만료로 표시
+    _popular_cache_ts = 0
+    _get_listing()          # 즉시 로드 (다음 요청에서 기다리지 않도록)
 
 
 def _lookup_overseas(name: str) -> tuple[str, str, str] | None:

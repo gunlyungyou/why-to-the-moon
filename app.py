@@ -1,19 +1,47 @@
 #!/usr/bin/env python3
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from dotenv import load_dotenv
+from zoneinfo import ZoneInfo
+from datetime import datetime, time as dtime
 import json
 import asyncio
 
 load_dotenv(Path(__file__).parent / '.env')
 
-from modules.stock import get_ticker_code, get_price_info, get_chart_data, is_overseas_index_ticker, get_market_context, get_surging_popular_stocks
+from modules.stock import get_ticker_code, get_price_info, get_chart_data, is_overseas_index_ticker, get_market_context, get_surging_popular_stocks, refresh_market_data
 from modules.news import get_naver_news, get_news_by_search
 from modules.analyzer import explain_price_movement
 
-app = FastAPI()
+KST = ZoneInfo('Asia/Seoul')
+REFRESH_INTERVAL = 600  # 장중 10분마다 갱신
+
+
+def _is_market_hours() -> bool:
+    now = datetime.now(KST)
+    return now.weekday() < 5 and dtime(9, 0) <= now.time() <= dtime(15, 30)
+
+
+async def _cache_refresh_loop():
+    while True:
+        if _is_market_hours():
+            await asyncio.to_thread(refresh_market_data)
+            await asyncio.sleep(REFRESH_INTERVAL)
+        else:
+            await asyncio.sleep(60)  # 장 외엔 1분마다 시간만 체크
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_cache_refresh_loop())
+    yield
+    task.cancel()
+
+
+app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
 
