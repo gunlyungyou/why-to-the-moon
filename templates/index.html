@@ -366,12 +366,11 @@ function showPrice(ticker, p) {
   document.getElementById('price-card').classList.add('show');
 }
 
-async function showChart(chartData, currency) {
+async function showChart(chartData, currency, prevClose) {
   if (!chartData || chartData.length === 0) return;
   const tz = TZ_MAP[currency] || 'UTC';
   const el = document.getElementById('chart-el');
 
-  // 카드가 이미 show 상태 + 브라우저 레이아웃 완료 대기
   await new Promise(resolve => requestAnimationFrame(resolve));
 
   if (chartInstance) { chartInstance.remove(); chartInstance = null; }
@@ -398,6 +397,19 @@ async function showChart(chartData, currency) {
     wickUpColor: '#f87171', wickDownColor: '#60a5fa',
   });
   series.setData(chartData);
+
+  // 어제 종가 기준선
+  if (prevClose) {
+    series.createPriceLine({
+      price: prevClose,
+      color: '#6b6b85',
+      lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: '전일 종가',
+    });
+  }
+
   chartInstance.timeScale().fitContent();
 }
 
@@ -504,7 +516,7 @@ async function runAnalyze(e) {
           progText.textContent = '주가 데이터 수집 중...';
         } else if (d.step === 'stock_done') {
           showPrice(d.ticker, d.price);
-          await showChart(d.chart, d.price.currency);
+          await showChart(d.chart, d.price.currency, d.price.prev_close);
         } else if (d.step === 'news') {
           progText.textContent = '뉴스 수집 중...';
         } else if (d.step === 'news_done') {

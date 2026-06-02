@@ -146,12 +146,31 @@ def _get_stock_price_info(ticker: str) -> dict:
         except Exception:
             pass
 
+    # 어제 종가 = 현재가 - 변동금액 (FDR Changes 필드)
+    changes = row.get('Changes')
+    prev_close = None
+    if current_price and changes is not None:
+        try:
+            prev_close = int(current_price - float(changes))
+        except Exception:
+            pass
+
+    # 변동률: 어제 종가 기준 (FDR ChagesRatio 우선 사용)
     change_rate = None
     change_sign = ''
     change_amount = None
-    if current_price and open_price and open_price > 0:
-        diff = current_price - open_price
-        change_rate = round(abs(diff) / open_price * 100, 2)
+    fdr_ratio = row.get('ChagesRatio')
+    if fdr_ratio is not None:
+        try:
+            r = float(fdr_ratio)
+            change_rate = round(abs(r), 2)
+            change_sign = '+' if r >= 0 else '-'
+            change_amount = abs(int(float(changes))) if changes is not None else None
+        except Exception:
+            pass
+    elif current_price and prev_close and prev_close > 0:
+        diff = current_price - prev_close
+        change_rate = round(abs(diff) / prev_close * 100, 2)
         change_sign = '+' if diff >= 0 else '-'
         change_amount = abs(diff)
 
@@ -162,6 +181,7 @@ def _get_stock_price_info(ticker: str) -> dict:
         'open_price': open_price,
         'high_price': high_price,
         'low_price': low_price,
+        'prev_close': prev_close,
         'volume': volume,
         'change_rate': change_rate,
         'change_sign': change_sign,
