@@ -65,15 +65,17 @@ _OVERSEAS_INDEX_MAP: dict[str, tuple[str, str, str]] = {
     'ftse': ('^FTSE', 'FTSE100', 'GBP'),
 }
 
-# 세션당 한 번만 다운로드
 _listing_cache: dict | None = None
+_listing_cache_ts: float = 0
+_LISTING_TTL = 1800  # 30분마다 갱신 (등락률 최신화)
 
 
 def _get_listing() -> dict:
-    global _listing_cache
-    if _listing_cache is None:
+    global _listing_cache, _listing_cache_ts
+    if _listing_cache is None or time.time() - _listing_cache_ts > _LISTING_TTL:
         df = fdr.StockListing('KRX')
         _listing_cache = df.set_index('Code').to_dict(orient='index')
+        _listing_cache_ts = time.time()
     return _listing_cache
 
 
