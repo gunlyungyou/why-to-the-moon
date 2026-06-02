@@ -26,10 +26,13 @@ def _is_market_hours() -> bool:
 
 
 async def _cache_refresh_loop():
+    # 서버 시작 시 항상 즉시 한 번 갱신 (장중 여부 무관)
+    await asyncio.to_thread(refresh_market_data)
+
     while True:
         if _is_market_hours():
-            await asyncio.to_thread(refresh_market_data)
             await asyncio.sleep(REFRESH_INTERVAL)
+            await asyncio.to_thread(refresh_market_data)
         else:
             await asyncio.sleep(60)  # 장 외엔 1분마다 시간만 체크
 
