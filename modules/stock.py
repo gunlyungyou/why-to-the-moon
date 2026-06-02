@@ -386,8 +386,48 @@ def get_surging_popular_stocks(limit: int = 10) -> list[dict]:
         return _popular_cache[:limit] if _popular_cache else []
 
 
+def _chart_from_naver(ticker: str) -> list[dict]:
+    """네이버 금융 1분봉 → 5분봉 집계. yfinance 실패 시 폴백."""
+    from zoneinfo import ZoneInfo
+    KST = ZoneInfo('Asia/Seoul')
+
+    url = f'https://fchart.stock.naver.com/sise.nhn?symbol={ticker}&timeframe=minute&count=400&requestType=0'
+    resp = requests.get(url, headers=NAVER_HEADERS, timeout=8)
+    resp.encoding = 'euc-kr'
+
+    items = re.findall(r'data="(\d{12})\|([^|]*)\|([^|]*)\|([^|]*)\|([^"]+)\|', resp.text)
+    if not items:
+        return []
+
+    # 가장 최근 거래일만 필터
+    last_day = items[-1][0][:8]
+    today_items = [(ts, c) for ts, o, h, l, c, *_ in items if ts[:8] == last_day and c not in ('null', '')]
+
+    # 5분 단위로 집계
+    buckets: dict[int, list[float]] = {}
+    for ts_str, close_str in today_items:
+        dt = datetime.strptime(ts_str, '%Y%m%d%H%M').replace(tzinfo=KST)
+        minute = dt.hour * 60 + dt.minute
+        bucket_min = (minute // 5) * 5
+        bucket_dt = dt.replace(hour=bucket_min // 60, minute=bucket_min % 60, second=0)
+        key = int(bucket_dt.timestamp())
+        buckets.setdefault(key, []).append(float(close_str))
+
+    result = []
+    for ts in sorted(buckets):
+        closes = buckets[ts]
+        result.append({
+            'time': ts,
+            'open': closes[0],
+            'high': max(closes),
+            'low': min(closes),
+            'close': closes[-1],
+        })
+    return result
+
+
 def get_chart_data(ticker: str, is_index: bool = False) -> list[dict]:
-    """5분봉 데이터 반환. 오늘 데이터 없으면 가장 최근 거래일 기준."""
+    """5분봉 데이터 반환. yfinance 실패 시 네이버 금융으로 폴백."""
     if is_index:
         yf_symbol = _FDR_TO_YF.get(ticker, ticker)
     else:
@@ -399,7 +439,7 @@ def get_chart_data(ticker: str, is_index: bool = False) -> list[dict]:
         tk = yf.Ticker(yf_symbol)
         df = tk.history(period='5d', interval='5m', auto_adjust=True)
         if df.empty:
-            return []
+            raise ValueError('empty')
 
         if df.index.tz:
             df.index = df.index.tz_convert('UTC')
@@ -409,7 +449,7 @@ def get_chart_data(ticker: str, is_index: bool = False) -> list[dict]:
         last_date = df.index[-1].date()
         df = df[df.index.date == last_date]
 
-        return [
+        result = [
             {
                 'time': int(row.Index.timestamp()),
                 'open': round(float(row.Open), 4),
@@ -420,5 +460,17 @@ def get_chart_data(ticker: str, is_index: bool = False) -> list[dict]:
             for row in df.itertuples()
             if not any(pd.isna(v) for v in [row.Open, row.High, row.Low, row.Close])
         ]
+        if result:
+            return result
+        raise ValueError('empty after filter')
     except Exception:
-        return []
+        pass
+
+    # 폴백: 네이버 금융 (국내 종목만)
+    if not is_index:
+        try:
+            return _chart_from_naver(ticker)
+        except Exception:
+            pass
+
+    return []
