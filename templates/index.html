@@ -124,6 +124,46 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
 }
 @keyframes sk-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.9; } }
 
+/* Watchlist */
+.watchlist-section { margin-bottom: 24px; }
+.watchlist-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.watchlist-icon { font-size: 0.75rem; }
+.watchlist-title { font-size: 0.78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+.watchlist-desc { font-size: 0.72rem; color: var(--muted); opacity: 0.65; margin-left: auto; }
+.watchlist-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+@media (max-width: 540px) { .watchlist-grid { grid-template-columns: repeat(2, 1fr); } }
+.watchlist-card {
+  padding: 11px 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+  min-width: 0;
+  position: relative;
+}
+.watchlist-card:hover { border-color: var(--accent); background: var(--surface2); }
+.watchlist-card:hover .watchlist-arrow { opacity: 1; }
+.watchlist-name {
+  font-size: 0.83rem; font-weight: 600; margin-bottom: 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.watchlist-sector {
+  font-size: 0.65rem; padding: 2px 7px;
+  background: rgba(124,106,247,0.12);
+  color: var(--accent2);
+  border-radius: 10px; display: inline-block;
+}
+.watchlist-arrow {
+  position: absolute; top: 9px; right: 10px;
+  font-size: 0.65rem; color: var(--accent2); opacity: 0;
+  transition: opacity 0.15s;
+}
+
 /* Progress */
 .progress {
   display: none;
@@ -252,6 +292,117 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
 /* Chart */
 #chart-el { width: 100%; height: 260px; }
 
+/* Tabs */
+.tab-bar {
+  display: none;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.tab-bar.show { display: flex; }
+.tab-btn {
+  padding: 9px 20px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+.tab-btn:hover:not(.active) { color: var(--text); }
+.tab-pane { display: none; }
+.tab-pane.show { display: block; }
+
+/* Advise tab — daily chart */
+#advise-chart-el { width: 100%; height: 300px; }
+
+/* Channel position bar */
+.channel-pos-wrap { padding: 0 2px; margin-bottom: 16px; }
+.cp-header { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); margin-bottom: 6px; }
+.cp-current { font-weight: 600; color: var(--text); }
+.cp-track {
+  height: 6px;
+  background: linear-gradient(to right, rgba(34,197,94,0.7), rgba(107,107,133,0.4), rgba(248,113,113,0.7));
+  border-radius: 3px; position: relative;
+}
+.cp-dot {
+  position: absolute; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 13px; height: 13px;
+  background: var(--text); border-radius: 50%;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 2px var(--accent);
+  transition: left 0.4s ease;
+}
+
+/* Win rate banner */
+.wr-banner {
+  display: grid; grid-template-columns: auto 1fr;
+  gap: 18px; align-items: center;
+  padding: 16px 20px;
+  background: var(--surface2); border-radius: 12px;
+  margin-bottom: 16px;
+}
+.wr-left { text-align: center; }
+.wr-pct {
+  font-size: 2.4rem; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.wr-pct.good { color: #22c55e; }
+.wr-pct.mid  { color: #f59e0b; }
+.wr-pct.bad  { color: var(--red); }
+.wr-pct.na   { color: var(--muted); font-size: 1.4rem; }
+.wr-sublabel { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+.wr-stats { display: flex; flex-direction: column; gap: 5px; }
+.wr-stat { font-size: 0.82rem; color: var(--muted); }
+.wr-stat strong { color: var(--text); font-weight: 600; }
+
+/* Trading advice card */
+.signal-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.signal-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; border-radius: 24px;
+  font-size: 1rem; font-weight: 700;
+}
+.signal-badge.buy   { background: rgba(34,197,94,0.15);  color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+.signal-badge.hold  { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+.signal-badge.sell  { background: rgba(248,113,113,0.15);color: var(--red); border: 1px solid rgba(248,113,113,0.3); }
+.signal-strength { font-size: 0.78rem; color: var(--muted); }
+.signal-summary { font-size: 0.9rem; line-height: 1.65; color: var(--muted); margin-bottom: 18px; }
+.price-targets {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  margin-bottom: 20px;
+}
+@media (max-width: 480px) { .price-targets { grid-template-columns: 1fr; } }
+.pt-box { padding: 13px 14px; background: var(--surface2); border-radius: 10px; }
+.pt-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.pt-val { font-size: 0.95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pt-val.green  { color: #22c55e; }
+.pt-val.purple { color: var(--accent2); }
+.pt-val.red    { color: var(--red); }
+.pt-sub { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+.advise-section { margin-bottom: 14px; }
+.advise-section-label {
+  font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.1em; margin-bottom: 7px;
+}
+.advise-section-label.green  { color: #22c55e; }
+.advise-section-label.orange { color: #f59e0b; }
+.advise-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.advise-list li {
+  font-size: 0.84rem; color: var(--muted); line-height: 1.45;
+  padding: 6px 10px 6px 14px;
+  background: var(--surface2); border-radius: 7px; position: relative;
+}
+.advise-list li::before { content: '•'; position: absolute; left: 6px; color: var(--muted); }
+.advise-disclaimer {
+  font-size: 0.72rem; color: var(--muted); opacity: 0.6;
+  border-top: 1px solid var(--border); padding-top: 12px; line-height: 1.55;
+}
+
 /* News */
 .news-list { list-style: none; }
 .news-item {
@@ -281,6 +432,16 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
       <input id="q" type="text" placeholder="삼성전자, 카카오, 니케이, 나스닥..." autocomplete="off" />
       <button type="submit" id="btn">분석하기</button>
     </form>
+  </div>
+
+  <!-- 매매 조언 가능 종목 -->
+  <div class="watchlist-section">
+    <div class="watchlist-header">
+      <span class="watchlist-icon">📊</span>
+      <span class="watchlist-title">매매 조언 종목</span>
+      <span class="watchlist-desc">백테스트 승률 · 회귀 채널 분석</span>
+    </div>
+    <div class="watchlist-grid" id="watchlist-grid"></div>
   </div>
 
   <!-- 급등 인기 종목 -->
@@ -315,25 +476,124 @@ main { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
     <div id="chart-el"></div>
   </div>
 
-  <div class="card" id="analysis-card">
-    <div class="card-label">AI 분석</div>
-    <div class="analysis-headline" id="a-headline"></div>
-    <div class="analysis-phases" id="a-phases"></div>
-    <button class="detail-toggle" onclick="toggleDetail()">
-      상세 분석 <span id="toggle-icon">▼</span>
-    </button>
-    <div class="analysis-detail" id="a-detail"></div>
+  <!-- Tab bar (shown after price card appears) -->
+  <div class="tab-bar" id="tab-bar">
+    <button class="tab-btn active" id="tab-flow-btn" onclick="switchTab('flow')">오늘의 흐름</button>
+    <button class="tab-btn" id="tab-advise-btn" onclick="switchTab('advise')">매매 조언</button>
   </div>
 
-  <div class="card" id="news-card">
-    <div class="card-label">관련 뉴스</div>
-    <ul class="news-list" id="n-list"></ul>
+  <!-- Tab: 오늘의 흐름 -->
+  <div class="tab-pane show" id="pane-flow">
+    <div class="card" id="analysis-card">
+      <div class="card-label">AI 분석</div>
+      <div class="analysis-headline" id="a-headline"></div>
+      <div class="analysis-phases" id="a-phases"></div>
+      <button class="detail-toggle" onclick="toggleDetail()">
+        상세 분석 <span id="toggle-icon">▼</span>
+      </button>
+      <div class="analysis-detail" id="a-detail"></div>
+    </div>
+
+    <div class="card" id="news-card">
+      <div class="card-label">관련 뉴스</div>
+      <ul class="news-list" id="n-list"></ul>
+    </div>
+  </div>
+
+  <!-- Tab: 매매 조언 -->
+  <div class="tab-pane" id="pane-advise">
+    <div class="progress" id="advise-prog"><div class="spinner"></div><span id="advise-prog-text">데이터 수집 중...</span></div>
+    <div class="error-box" id="advise-err"></div>
+
+    <!-- 일봉 차트 + 채널 -->
+    <div class="card" id="advise-chart-card">
+      <div class="card-label">일봉 차트 (120일) — 회귀 채널</div>
+      <div id="advise-chart-el"></div>
+    </div>
+
+    <!-- 채널 내 현재 위치 -->
+    <div class="channel-pos-wrap" id="channel-pos-wrap" style="display:none">
+      <div class="cp-header">
+        <span>채널 하단 (지지)</span>
+        <span class="cp-current" id="cp-pos-label"></span>
+        <span>채널 상단 (저항)</span>
+      </div>
+      <div class="cp-track"><div class="cp-dot" id="cp-dot" style="left:50%"></div></div>
+    </div>
+
+    <!-- 백테스트 승률 배너 -->
+    <div class="wr-banner" id="wr-banner" style="display:none">
+      <div class="wr-left">
+        <div class="wr-pct" id="wr-pct">-</div>
+        <div class="wr-sublabel">과거 승률</div>
+      </div>
+      <div class="wr-stats">
+        <div class="wr-stat" id="wr-stat1"></div>
+        <div class="wr-stat" id="wr-stat2"></div>
+        <div class="wr-stat" id="wr-stat3"></div>
+      </div>
+    </div>
+
+    <!-- AI 신호 카드 -->
+    <div class="card" id="advise-card">
+      <div class="card-label">단기 매매 조언</div>
+      <div class="signal-row">
+        <span class="signal-badge" id="av-badge"></span>
+        <span class="signal-strength" id="av-strength"></span>
+      </div>
+      <div class="signal-summary" id="av-summary"></div>
+      <div class="price-targets" id="av-targets"></div>
+      <div class="advise-section" id="av-reasons-wrap">
+        <div class="advise-section-label green">매매 근거</div>
+        <ul class="advise-list" id="av-reasons"></ul>
+      </div>
+      <div class="advise-section" id="av-risks-wrap">
+        <div class="advise-section-label orange">주요 리스크</div>
+        <ul class="advise-list" id="av-risks"></ul>
+      </div>
+      <div class="advise-disclaimer">
+        이 분석은 기술적 지표(RSI, MACD, 볼린저밴드)와 백테스트를 AI가 해석한 참고 정보이며, 실제 투자 권유가 아닙니다.
+        과거 승률이 미래 수익을 보장하지 않으며, 투자 결과에 대한 책임은 투자자 본인에게 있습니다.
+      </div>
+    </div>
   </div>
 </main>
 
 <script>
 const TZ_MAP = { KRW: 'Asia/Seoul', JPY: 'Asia/Tokyo', USD: 'America/New_York', HKD: 'Asia/Hong_Kong', CNY: 'Asia/Shanghai', EUR: 'Europe/Berlin', GBP: 'Europe/London' };
 let chartInstance = null;
+let adviseChartInstance = null;
+let currentTicker = null;
+let adviseLoaded = false;
+let autoSwitchToAdvise = false;
+
+const WATCHLIST = [
+  { name: '삼성전자',       sector: '반도체' },
+  { name: 'SK하이닉스',     sector: '반도체' },
+  { name: '현대차',         sector: '자동차' },
+  { name: '기아',           sector: '자동차' },
+  { name: 'NAVER',          sector: 'IT' },
+  { name: '카카오',         sector: 'IT' },
+  { name: 'POSCO홀딩스',    sector: '소재' },
+  { name: '셀트리온',       sector: '바이오' },
+  { name: '삼성바이오로직스', sector: '바이오' },
+  { name: 'LG에너지솔루션', sector: '배터리' },
+];
+
+function initWatchlist() {
+  document.getElementById('watchlist-grid').innerHTML = WATCHLIST.map(s => `
+    <div class="watchlist-card" onclick="pickWatchlist('${s.name}')">
+      <div class="watchlist-arrow">▶</div>
+      <div class="watchlist-name">${s.name}</div>
+      <span class="watchlist-sector">${s.sector}</span>
+    </div>`).join('');
+}
+
+function pickWatchlist(name) {
+  autoSwitchToAdvise = true;
+  document.getElementById('q').value = name;
+  document.querySelector('.search-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+}
 
 function fmt(v, currency) {
   if (typeof v !== 'number') return v || 'N/A';
@@ -342,14 +602,178 @@ function fmt(v, currency) {
 }
 
 function reset() {
-  ['price-card','analysis-card','news-card'].forEach(id => document.getElementById(id).classList.remove('show'));
+  ['price-card','analysis-card','news-card','advise-chart-card','advise-card'].forEach(id => document.getElementById(id).classList.remove('show'));
+  document.getElementById('tab-bar').classList.remove('show');
+  document.getElementById('advise-prog').classList.remove('show');
+  document.getElementById('advise-err').classList.remove('show');
+  document.getElementById('channel-pos-wrap').style.display = 'none';
+  document.getElementById('wr-banner').style.display = 'none';
   if (chartInstance) { chartInstance.remove(); chartInstance = null; }
+  if (adviseChartInstance) { adviseChartInstance.remove(); adviseChartInstance = null; }
   document.getElementById('err').classList.remove('show');
   document.getElementById('a-headline').textContent = '';
   document.getElementById('a-phases').innerHTML = '';
   document.getElementById('a-detail').textContent = '';
   document.getElementById('a-detail').classList.remove('open');
   document.getElementById('toggle-icon').textContent = '▼';
+  currentTicker = null;
+  adviseLoaded = false;
+  switchTab('flow', true);
+}
+
+function switchTab(tab, silent) {
+  const isFlow = tab === 'flow';
+  document.getElementById('tab-flow-btn').classList.toggle('active', isFlow);
+  document.getElementById('tab-advise-btn').classList.toggle('active', !isFlow);
+  document.getElementById('pane-flow').classList.toggle('show', isFlow);
+  document.getElementById('pane-advise').classList.toggle('show', !isFlow);
+  if (!isFlow && !adviseLoaded && currentTicker && !silent) {
+    loadAdvise(currentTicker);
+  }
+}
+
+function loadAdvise(tickerName) {
+  adviseLoaded = true;
+  const prog = document.getElementById('advise-prog');
+  const progText = document.getElementById('advise-prog-text');
+  const errEl = document.getElementById('advise-err');
+  errEl.classList.remove('show');
+  document.getElementById('advise-card').classList.remove('show');
+  document.getElementById('advise-chart-card').classList.remove('show');
+  document.getElementById('channel-pos-wrap').style.display = 'none';
+  document.getElementById('wr-banner').style.display = 'none';
+  prog.classList.add('show');
+  progText.textContent = '일봉 데이터 수집 중...';
+
+  fetch('/api/advise?ticker_name=' + encodeURIComponent(tickerName))
+    .then(r => r.body.getReader())
+    .then(async reader => {
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue;
+          const d = JSON.parse(part.slice(6));
+          if (d.step === 'loading') {
+            progText.textContent = '일봉 데이터 수집 중...';
+          } else if (d.step === 'chart_done') {
+            showAdviseChart(d.candles, d.channel);
+            showWinRate(d.backtest, d.channel);
+            progText.textContent = 'Claude AI 분석 중...';
+          } else if (d.step === 'analyzing') {
+            progText.textContent = 'Claude AI 분석 중...';
+          } else if (d.step === 'done') {
+            prog.classList.remove('show');
+            showAdvise(d.result);
+          } else if (d.step === 'error') {
+            prog.classList.remove('show');
+            errEl.textContent = d.msg;
+            errEl.classList.add('show');
+          }
+        }
+      }
+    })
+    .catch(err => {
+      prog.classList.remove('show');
+      errEl.textContent = '연결 오류: ' + err.message;
+      errEl.classList.add('show');
+    });
+}
+
+async function showAdviseChart(candles, channel) {
+  const el = document.getElementById('advise-chart-el');
+  if (adviseChartInstance) { adviseChartInstance.remove(); adviseChartInstance = null; }
+
+  await new Promise(r => requestAnimationFrame(r));
+
+  adviseChartInstance = LightweightCharts.createChart(el, {
+    autoSize: true, height: 300,
+    layout: { background: { color: '#16161f' }, textColor: '#6b6b85' },
+    grid: { vertLines: { color: '#2a2a38' }, horzLines: { color: '#2a2a38' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: '#2a2a38' },
+    timeScale: { borderColor: '#2a2a38', timeVisible: false },
+  });
+
+  const candleSeries = adviseChartInstance.addCandlestickSeries({
+    upColor: '#f87171', downColor: '#60a5fa',
+    borderUpColor: '#f87171', borderDownColor: '#60a5fa',
+    wickUpColor: '#f87171', wickDownColor: '#60a5fa',
+  });
+  candleSeries.setData(candles);
+
+  const LS = LightweightCharts.LineStyle;
+  const mkLine = (color, title) => adviseChartInstance.addLineSeries({
+    color, lineWidth: 1, lineStyle: LS.Dashed,
+    priceLineVisible: false, lastValueVisible: !!title,
+    title: title || '',
+  });
+
+  mkLine('rgba(248,113,113,0.55)', '저항').setData(channel.upper);
+  mkLine('rgba(107,107,133,0.45)', '').setData(channel.center);
+  mkLine('rgba(34,197,94,0.55)', '지지').setData(channel.lower);
+
+  adviseChartInstance.timeScale().fitContent();
+  document.getElementById('advise-chart-card').classList.add('show');
+}
+
+function showWinRate(backtest, channel) {
+  // 채널 위치 바
+  const pos = channel.channel_pos ?? 0.5;
+  document.getElementById('cp-dot').style.left = (pos * 100).toFixed(1) + '%';
+  const posLabel = pos < 0.33 ? '채널 하단 (지지 구간)' : pos > 0.67 ? '채널 상단 (저항 구간)' : '채널 중간';
+  document.getElementById('cp-pos-label').textContent = posLabel;
+  document.getElementById('channel-pos-wrap').style.display = '';
+
+  // 승률 배너
+  const wr = backtest.win_rate;
+  const pctEl = document.getElementById('wr-pct');
+  if (wr !== null && wr !== undefined) {
+    pctEl.textContent = wr + '%';
+    pctEl.className = 'wr-pct ' + (wr >= 60 ? 'good' : wr >= 45 ? 'mid' : 'bad');
+    document.getElementById('wr-stat1').innerHTML = `과거 유사 신호 <strong>${backtest.n_signals}회</strong> 발생`;
+    document.getElementById('wr-stat2').innerHTML = `${backtest.forward_days}거래일 후 <strong>+${backtest.min_return_pct}%</strong> 이상 수익 <strong>${backtest.n_wins}회</strong>`;
+    const avg = backtest.avg_return;
+    document.getElementById('wr-stat3').innerHTML = `평균 수익률 <strong>${avg >= 0 ? '+' : ''}${avg}%</strong>`;
+  } else {
+    pctEl.textContent = '데이터 부족';
+    pctEl.className = 'wr-pct na';
+    document.getElementById('wr-stat1').innerHTML = `유사 신호 <strong>${backtest.n_signals}회</strong> — 통계 산출 불가 (3회 이상 필요)`;
+    document.getElementById('wr-stat2').textContent = '';
+    document.getElementById('wr-stat3').textContent = '';
+  }
+  document.getElementById('wr-banner').style.display = '';
+}
+
+function showAdvise(r) {
+  const signal = r.signal || '관망';
+  const cls = signal === '매수 고려' ? 'buy' : signal === '매도 고려' ? 'sell' : 'hold';
+  const icon = signal === '매수 고려' ? '▲' : signal === '매도 고려' ? '▼' : '─';
+  document.getElementById('av-badge').className = 'signal-badge ' + cls;
+  document.getElementById('av-badge').textContent = icon + ' ' + signal;
+  document.getElementById('av-strength').textContent = '신호 강도: ' + (r.signal_strength || '');
+  document.getElementById('av-summary').textContent = r.summary || '';
+
+  const targets = document.getElementById('av-targets');
+  const hasBuy = r.buy_zone && r.buy_zone !== 'null';
+  const hasTgt = r.target_price && r.target_price !== 'null';
+  const hasStop = r.stop_loss && r.stop_loss !== 'null';
+  targets.innerHTML = [
+    hasBuy  ? `<div class="pt-box"><div class="pt-label">매수 구간</div><div class="pt-val green">${r.buy_zone}</div>${r.holding_period ? `<div class="pt-sub">예상 보유 ${r.holding_period}</div>` : ''}</div>` : '',
+    hasTgt  ? `<div class="pt-box"><div class="pt-label">목표가</div><div class="pt-val purple">${r.target_price}</div></div>` : '',
+    hasStop ? `<div class="pt-box"><div class="pt-label">손절 기준</div><div class="pt-val red">${r.stop_loss}</div></div>` : '',
+  ].filter(Boolean).join('');
+
+  document.getElementById('av-reasons').innerHTML = (r.reasons || []).map(t => `<li>${t}</li>`).join('');
+  document.getElementById('av-risks').innerHTML = (r.risks || []).map(t => `<li>${t}</li>`).join('');
+  document.getElementById('av-reasons-wrap').style.display = (r.reasons?.length) ? '' : 'none';
+  document.getElementById('av-risks-wrap').style.display = (r.risks?.length) ? '' : 'none';
+  document.getElementById('advise-card').classList.add('show');
 }
 
 function showPrice(ticker, p) {
@@ -364,6 +788,12 @@ function showPrice(ticker, p) {
   document.getElementById('p-cur').textContent = fmt(p.current_price, p.currency);
   document.getElementById('p-time').textContent = p.as_of || '-';
   document.getElementById('price-card').classList.add('show');
+  document.getElementById('tab-bar').classList.add('show');
+  currentTicker = document.getElementById('q').value.trim();
+  if (autoSwitchToAdvise) {
+    autoSwitchToAdvise = false;
+    switchTab('advise');
+  }
 }
 
 async function showChart(chartData, currency, prevClose) {
@@ -484,7 +914,7 @@ function pickPopular(name) {
   document.querySelector('.search-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 }
 
-document.addEventListener('DOMContentLoaded', loadPopular);
+document.addEventListener('DOMContentLoaded', () => { initWatchlist(); loadPopular(); });
 
 async function runAnalyze(e) {
   e.preventDefault();

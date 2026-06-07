@@ -14,7 +14,8 @@ load_dotenv(Path(__file__).parent / '.env')
 
 from modules.stock import get_ticker_code, get_price_info, get_chart_data, is_overseas_index_ticker, get_market_context, get_surging_popular_stocks, refresh_market_data
 from modules.news import get_naver_news, get_news_by_search
-from modules.analyzer import explain_price_movement
+from modules.analyzer import explain_price_movement, advise_trading
+from modules.signal import get_chart_and_analysis
 
 KST = ZoneInfo('Asia/Seoul')
 REFRESH_INTERVAL = 600  # 장중 10분마다 갱신
@@ -82,6 +83,45 @@ async def analyze(ticker_name: str):
 
             yield f"data: {json.dumps({'step': 'analyzing'}, ensure_ascii=False)}\n\n"
             result = await asyncio.to_thread(explain_price_movement, ticker_name, price, news, chart, None, mkt_ctx)
+            yield f"data: {json.dumps({'step': 'done', 'result': result}, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'step': 'error', 'msg': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/advise")
+async def advise(ticker_name: str):
+    async def generate():
+        try:
+            yield f"data: {json.dumps({'step': 'loading'}, ensure_ascii=False)}\n\n"
+            ticker = await asyncio.to_thread(get_ticker_code, ticker_name)
+
+            if is_overseas_index_ticker(ticker):
+                yield f"data: {json.dumps({'step': 'error', 'msg': '해외 지수는 매매 조언을 제공하지 않습니다. 국내 주식 종목명을 입력해 주세요.'}, ensure_ascii=False)}\n\n"
+                return
+
+            # 차트·지표·백테스트와 뉴스 병렬 수집
+            chart_data, news = await asyncio.gather(
+                asyncio.to_thread(get_chart_and_analysis, ticker),
+                asyncio.to_thread(get_naver_news, ticker, ticker_name, 5),
+            )
+
+            # 차트 먼저 전송 → UI가 바로 그릴 수 있도록
+            yield f"data: {json.dumps({'step': 'chart_done', 'candles': chart_data['candles'], 'channel': chart_data['channel'], 'backtest': chart_data['backtest']}, ensure_ascii=False)}\n\n"
+
+            yield f"data: {json.dumps({'step': 'analyzing'}, ensure_ascii=False)}\n\n"
+
+            price = await asyncio.to_thread(get_price_info, ticker)
+            result = await asyncio.to_thread(
+                advise_trading, ticker_name, price,
+                chart_data['indicators'], chart_data['backtest'], news,
+            )
             yield f"data: {json.dumps({'step': 'done', 'result': result}, ensure_ascii=False)}\n\n"
 
         except Exception as e:

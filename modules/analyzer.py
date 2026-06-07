@@ -3,6 +3,39 @@ import json
 import re
 import anthropic
 
+TRADING_SYSTEM_PROMPT = """당신은 단기 주식 매매(수일~2주) 전문 기술적 분석가입니다. 반드시 한국어로, 반드시 JSON 형식으로만 답변하세요.
+
+주어진 기술적 지표와 뉴스를 분석하고 아래 JSON만 출력하세요 (마크다운 코드블록 없이):
+
+{
+  "signal": "매수 고려" | "관망" | "매도 고려",
+  "signal_strength": "강" | "중" | "약",
+  "summary": "현재 기술적 상황 1~2문장",
+  "buy_zone": "XX,XXX원 ~ XX,XXX원 또는 null",
+  "target_price": "XX,XXX원 또는 null",
+  "stop_loss": "XX,XXX원 또는 null",
+  "holding_period": "X~Y일 또는 null",
+  "reasons": ["근거 1", "근거 2", "근거 3"],
+  "risks": ["리스크 1", "리스크 2"]
+}
+
+판단 기준 (단기 기준):
+- RSI < 35: 과매도 → 매수 신호
+- RSI > 65: 과매수 → 매도 신호
+- MACD 히스토그램 음→양 전환: 매수 신호
+- MACD 히스토그램 양→음 전환: 매도 신호
+- 볼린저밴드 %B < 0.2: 하단 근접 → 반등 가능
+- 볼린저밴드 %B > 0.8: 상단 근접 → 과열
+- 현재가 MA20 대비 -5% 이하: 지지 구간
+- 현재가 MA20 대비 +7% 이상: 저항 구간
+- 거래량 1.5배 이상: 신호 강도 상승
+- 복수 신호 일치 시 "강", 단일 신호 시 "중", 혼재 시 "약"
+
+buy_zone: 매수 고려 시 이상적 진입 범위 (현재가 ±2~3%), 관망/매도 시 null
+target_price: 단기 목표가 (최근 20일 고점 또는 MA20/60 기준), 관망/매도 시 null
+stop_loss: 손절 기준가 (최근 20일 저점 또는 볼린저밴드 하단 기준, -3~5%), 매수 고려 시만 필수
+holding_period: 예상 보유 기간 (예: "3~7일"), 매수 고려 시만 필수"""
+
 CLAUDE_MODEL = 'claude-sonnet-4-6'
 
 SYSTEM_PROMPT = """당신은 한국 주식 시장 전문가입니다. 반드시 한국어로, 반드시 JSON 형식으로만 답변하세요.
@@ -119,3 +152,76 @@ def explain_price_movement(ticker_name, price_info, news_items, chart_data=None,
         return json.loads(raw)
     except json.JSONDecodeError:
         return {'headline': '분석 완료', 'phases': [], 'detail': raw}
+
+
+def advise_trading(ticker_name: str, price_info: dict, indicators: dict,
+                   backtest: dict, news_items: list) -> dict:
+    cur = price_info.get('current_price', 0)
+    currency = price_info.get('currency', 'KRW')
+
+    def fp(v):
+        if v is None:
+            return 'N/A'
+        if currency == 'KRW':
+            return f"{int(v):,}원"
+        return f"{v:,.2f} {currency}"
+
+    ind = indicators
+    news_lines = '\n'.join(
+        f"- [{item.get('time', '')}] {item.get('title', '')}"
+        for item in news_items[:5]
+    ) or '- 관련 뉴스 없음'
+
+    ma60_line = ''
+    if ind.get('ma60') is not None:
+        pct = ind.get('price_vs_ma60')
+        ma60_line = f"MA(60): {fp(ind['ma60'])} (현재가 대비 {pct:+.1f}%)\n" if pct is not None else f"MA(60): {fp(ind['ma60'])}\n"
+
+    pct20 = ind.get('price_vs_ma20')
+    ma20_line = f"MA(20): {fp(ind.get('ma20'))} (현재가 대비 {pct20:+.1f}%)\n" if pct20 is not None else f"MA(20): {fp(ind.get('ma20'))}\n"
+
+    backtest_section = ''
+    if backtest.get('win_rate') is not None:
+        backtest_section = (
+            f"\n[백테스트 결과 — 현재와 동일한 지표 조건]\n"
+            f"과거 유사 신호 발생 횟수: {backtest['n_signals']}회\n"
+            f"{backtest['forward_days']}거래일 후 +{backtest['min_return_pct']}% 이상 상승: {backtest['n_wins']}회\n"
+            f"승률: {backtest['win_rate']}%\n"
+            f"평균 수익률: {backtest['avg_return']:+.2f}%\n"
+        )
+    elif backtest.get('n_signals', 0) < 3:
+        backtest_section = f"\n[백테스트] 과거 유사 신호가 {backtest.get('n_signals', 0)}회로 통계적으로 불충분합니다.\n"
+
+    msg = (
+        f"[{ticker_name} 기술적 분석 데이터]\n"
+        f"현재가: {fp(cur)}\n"
+        f"{ma20_line}"
+        f"{ma60_line}"
+        f"RSI(14): {ind.get('rsi', 'N/A')} (전일: {ind.get('rsi_prev', 'N/A')})\n"
+        f"MACD 히스토그램: {ind.get('macd_hist', 'N/A')} (전일: {ind.get('macd_hist_prev', 'N/A')})\n"
+        f"볼린저밴드 %B: {ind.get('bb_pct', 'N/A')} (상단: {fp(ind.get('bb_upper'))}, 하단: {fp(ind.get('bb_lower'))})\n"
+        f"최근 20일 고점: {fp(ind.get('recent_high_20d'))}\n"
+        f"최근 20일 저점: {fp(ind.get('recent_low_20d'))}\n"
+        f"거래량 (20일 평균 대비): {ind.get('vol_ratio', 1):.1f}배"
+        f"{backtest_section}\n\n"
+        f"최근 뉴스:\n{news_lines}\n\n"
+        f"위 데이터를 바탕으로 단기(수일~2주) 매매 조언을 제시해 주세요. "
+        f"백테스트 승률이 있다면 반드시 근거로 언급하세요."
+    )
+
+    client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
+    response = client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=1024,
+        system=TRADING_SYSTEM_PROMPT,
+        messages=[{'role': 'user', 'content': msg}],
+    )
+
+    raw = response.content[0].text.strip()
+    raw = re.sub(r'^```(?:json)?\s*', '', raw)
+    raw = re.sub(r'\s*```$', '', raw)
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {'signal': '분석 오류', 'signal_strength': '약', 'summary': raw, 'reasons': [], 'risks': []}
