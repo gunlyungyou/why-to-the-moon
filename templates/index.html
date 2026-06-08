@@ -708,15 +708,14 @@ async function showAdviseChart(candles, channel) {
   candleSeries.setData(candles);
 
   const LS = LightweightCharts.LineStyle;
-  const mkLine = (color, title) => adviseChartInstance.addLineSeries({
+  const mkLine = (color) => adviseChartInstance.addLineSeries({
     color, lineWidth: 1, lineStyle: LS.Dashed,
-    priceLineVisible: false, lastValueVisible: !!title,
-    title: title || '',
+    priceLineVisible: false, lastValueVisible: false,
   });
 
-  mkLine('rgba(248,113,113,0.55)', '저항').setData(channel.upper);
-  mkLine('rgba(107,107,133,0.45)', '').setData(channel.center);
-  mkLine('rgba(34,197,94,0.55)', '지지').setData(channel.lower);
+  mkLine('rgba(248,113,113,0.55)').setData(channel.upper);
+  mkLine('rgba(107,107,133,0.45)').setData(channel.center);
+  mkLine('rgba(34,197,94,0.55)').setData(channel.lower);
 
   adviseChartInstance.timeScale().fitContent();
   document.getElementById('advise-chart-card').classList.add('show');
