@@ -1,0 +1,26 @@
+name: 시장 경보 알림
+
+on:
+  schedule:
+    - cron: '50 23 * * 0-4'  # 평일 08:50 KST (UTC+9 → UTC 23:50 전날)
+    - cron: '0 0 * * 6'       # 토요일 09:00 KST (UTC 00:00)
+  workflow_dispatch:           # 수동 실행 버튼
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 패키지 설치
+        run: pip install yfinance requests python-dotenv
+
+      - name: 시장 경보 발송
+        run: python -c "from modules.market_alert import run_alert; run_alert()"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

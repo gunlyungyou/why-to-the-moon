@@ -114,17 +114,21 @@ def build_message(s: dict) -> str:
 
 
 def send_telegram(message: str) -> bool:
-    token   = os.environ.get('TELEGRAM_BOT_TOKEN')
-    chat_id = os.environ.get('TELEGRAM_CHAT_ID')
-    if not token or not chat_id:
+    token    = os.environ.get('TELEGRAM_BOT_TOKEN')
+    chat_ids = [c.strip() for c in os.environ.get('TELEGRAM_CHAT_ID', '').split(',') if c.strip()]
+    if not token or not chat_ids:
         print("[텔레그램 미설정] 콘솔 출력:\n", message)
         return False
-    resp = requests.post(
-        f"https://api.telegram.org/bot{token}/sendMessage",
-        json={'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'},
-        timeout=10,
-    )
-    return resp.status_code == 200
+    ok = True
+    for chat_id in chat_ids:
+        resp = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            ok = False
+    return ok
 
 
 def run_alert():
