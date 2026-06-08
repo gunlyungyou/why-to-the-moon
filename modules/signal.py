@@ -7,10 +7,29 @@ from datetime import date, timedelta
 def _load_daily(ticker: str, days: int = 520) -> pd.DataFrame:
     end = date.today().strftime('%Y-%m-%d')
     start = (date.today() - timedelta(days=days + 60)).strftime('%Y-%m-%d')
-    df = fdr.DataReader(ticker, start, end)
-    if df.empty or len(df) < 30:
-        raise ValueError("기술적 분석을 위한 데이터가 부족합니다")
-    return df.tail(days)
+
+    # FDR 우선 시도 (로컬/한국 IP 환경)
+    try:
+        df = fdr.DataReader(ticker, start, end)
+        if not df.empty and len(df) >= 30:
+            return df.tail(days)
+    except Exception:
+        pass
+
+    # yfinance 폴백 (해외 서버 환경에서 KRX API 차단 시)
+    import yfinance as yf
+    for suffix in ['.KS', '.KQ']:
+        try:
+            df = yf.Ticker(ticker + suffix).history(start=start, end=end, interval='1d', auto_adjust=True)
+            if df.empty or len(df) < 30:
+                continue
+            if df.index.tz:
+                df.index = df.index.tz_localize(None)
+            return df.tail(days)
+        except Exception:
+            continue
+
+    raise ValueError("기술적 분석을 위한 데이터가 부족합니다")
 
 
 def _to_date_str(idx) -> str:
