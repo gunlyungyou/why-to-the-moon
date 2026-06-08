@@ -70,10 +70,35 @@ _listing_cache_ts: float = 0
 _LISTING_TTL = 1800  # 요청 기반 폴백용 TTL (백그라운드 갱신이 주 경로)
 
 
+_GH_LISTING = 'https://raw.githubusercontent.com/FinanceData/fdr_krx_data_cache/refs/heads/master/data/listing/krx/{date}.csv'
+
+
+def _fetch_listing_df() -> pd.DataFrame:
+    """fdr.StockListing 실패 시 GitHub 캐시에서 최근 영업일 데이터로 폴백."""
+    try:
+        return fdr.StockListing('KRX')
+    except Exception:
+        pass
+    # 오늘 날짜 CSV가 GitHub에 없는 경우(당일 미업데이트) 최대 7일 전까지 시도
+    for delta in range(1, 8):
+        candidate = date.today() - timedelta(days=delta)
+        if candidate.weekday() >= 5:  # 주말 건너뜀
+            continue
+        try:
+            df = pd.read_csv(
+                _GH_LISTING.format(date=candidate.strftime('%Y-%m-%d')),
+                index_col=0, dtype={'Code': str},
+            )
+            return df.reset_index(drop=True)
+        except Exception:
+            continue
+    raise ValueError("KRX 종목 데이터를 불러올 수 없습니다")
+
+
 def _get_listing() -> dict:
     global _listing_cache, _listing_cache_ts
     if _listing_cache is None or time.time() - _listing_cache_ts > _LISTING_TTL:
-        df = fdr.StockListing('KRX')
+        df = _fetch_listing_df()
         _listing_cache = df.set_index('Code').to_dict(orient='index')
         _listing_cache_ts = time.time()
     return _listing_cache
