@@ -1,16 +1,15 @@
 import os
 import requests
-import yfinance as yf
-from datetime import datetime, date
+import FinanceDataReader as fdr
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 KST = ZoneInfo('Asia/Seoul')
 
 
-def _last_and_pct(symbol: str) -> tuple[float | None, float | None]:
+def _fdr_last_and_pct(symbol: str) -> tuple[float | None, float | None]:
     try:
-        df = yf.Ticker(symbol).history(period='5d', interval='1d', auto_adjust=True)
-        df = df['Close'].dropna()
+        df = fdr.DataReader(symbol)['Close'].dropna()
         if len(df) < 2:
             return None, None
         prev = float(df.iloc[-2])
@@ -43,16 +42,9 @@ def _fetch_breadth(today: str) -> dict:
 
 def fetch_krx_snapshot() -> dict:
     today = datetime.now(KST).strftime('%Y%m%d')
-    kospi_price, kospi_pct   = _last_and_pct('^KS11')
-    kosdaq_price, kosdaq_pct = _last_and_pct('^KQ11')
-    _, usd_krw_pct = _last_and_pct('KRW=X')
-
-    try:
-        df = yf.Ticker('KRW=X').history(period='5d', interval='1d', auto_adjust=True)
-        series = df['Close'].dropna()
-        usd_krw = float(series.iloc[-1]) if not series.empty else None
-    except Exception:
-        usd_krw = None
+    kospi_price, kospi_pct   = _fdr_last_and_pct('KS11')
+    kosdaq_price, kosdaq_pct = _fdr_last_and_pct('KQ11')
+    usd_krw, usd_krw_pct     = _fdr_last_and_pct('USD/KRW')
 
     breadth = _fetch_breadth(today)
     return {

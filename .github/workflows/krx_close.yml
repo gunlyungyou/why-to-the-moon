@@ -16,7 +16,7 @@ jobs:
           python-version: '3.11'
 
       - name: 패키지 설치
-        run: pip install yfinance pykrx requests python-dotenv
+        run: pip install finance-datareader pykrx requests python-dotenv
 
       - name: 한국장 마감 요약 발송
         run: python -c "from modules.krx_close import run_krx_close; run_krx_close()"
