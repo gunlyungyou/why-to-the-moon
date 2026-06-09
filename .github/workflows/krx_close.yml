@@ -1,0 +1,25 @@
+name: 한국 시장 마감 요약
+
+on:
+  schedule:
+    - cron: '30 6 * * 1-5'  # 평일 15:30 KST (UTC+9 → UTC 06:30)
+  workflow_dispatch:          # 수동 실행 버튼
+
+jobs:
+  close-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 패키지 설치
+        run: pip install yfinance pykrx requests python-dotenv
+
+      - name: 한국장 마감 요약 발송
+        run: python -c "from modules.krx_close import run_krx_close; run_krx_close()"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
