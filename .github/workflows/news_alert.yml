@@ -1,0 +1,32 @@
+name: 연합뉴스 속보 알림
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # 5분마다
+  workflow_dispatch:         # 수동 실행 버튼
+
+jobs:
+  news-alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 기사 ID 캐시 복원
+        uses: actions/cache@v4
+        with:
+          path: .seen_news.json
+          key: seen-news-${{ github.run_id }}
+          restore-keys: seen-news-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 패키지 설치
+        run: pip install requests python-dotenv
+
+      - name: 속보 알림 발송
+        run: python -c "from modules.news_alert import run_news_alert; run_news_alert()"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
