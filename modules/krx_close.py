@@ -10,10 +10,11 @@ KST = ZoneInfo('Asia/Seoul')
 def _last_and_pct(symbol: str) -> tuple[float | None, float | None]:
     try:
         df = yf.Ticker(symbol).history(period='5d', interval='1d', auto_adjust=True)
+        df = df['Close'].dropna()
         if len(df) < 2:
             return None, None
-        prev = float(df['Close'].iloc[-2])
-        last = float(df['Close'].iloc[-1])
+        prev = float(df.iloc[-2])
+        last = float(df.iloc[-1])
         pct = round((last - prev) / prev * 100, 2)
         return round(last, 2), pct
     except Exception:
@@ -47,8 +48,9 @@ def fetch_krx_snapshot() -> dict:
     _, usd_krw_pct = _last_and_pct('KRW=X')
 
     try:
-        df = yf.Ticker('KRW=X').history(period='2d', interval='1d', auto_adjust=True)
-        usd_krw = float(df['Close'].iloc[-1]) if not df.empty else None
+        df = yf.Ticker('KRW=X').history(period='5d', interval='1d', auto_adjust=True)
+        series = df['Close'].dropna()
+        usd_krw = float(series.iloc[-1]) if not series.empty else None
     except Exception:
         usd_krw = None
 
