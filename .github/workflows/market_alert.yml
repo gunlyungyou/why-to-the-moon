@@ -2,7 +2,7 @@ name: 시장 경보 알림
 
 on:
   schedule:
-    - cron: '50 23 * * 0-4'  # 평일 08:50 KST (UTC+9 → UTC 23:50 전날)
+    - cron: '0 23 * * 0-4'   # 평일 08:00 KST (UTC+9 → UTC 23:00 전날)
     - cron: '0 0 * * 6'       # 토요일 09:00 KST (UTC 00:00)
   workflow_dispatch:           # 수동 실행 버튼
 
