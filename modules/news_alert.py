@@ -72,6 +72,8 @@ def run_news_alert():
     # 30분 이내 기사만 처리 (오래된 피드 항목 제외)
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
 
+    seen_titles: set[str] = set()  # 이번 실행 내 제목 중복 제거용
+
     new_articles: list[dict] = []
     for category, url in RSS_FEEDS:
         for article in _parse_feed(url):
@@ -79,6 +81,12 @@ def run_news_alert():
                 continue
             seen.add(article['id'])
             if not is_first_run and article['pub'] >= cutoff:
+                if '[속보]' not in article['title']:
+                    continue
+                norm = article['title'].replace('[속보]', '').strip()
+                if norm in seen_titles:
+                    continue
+                seen_titles.add(norm)
                 article['category'] = category
                 new_articles.append(article)
 
