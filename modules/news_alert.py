@@ -2,7 +2,7 @@ import os
 import json
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from zoneinfo import ZoneInfo
 
@@ -69,9 +69,6 @@ def run_news_alert():
     is_first_run = not os.path.exists(STATE_FILE)
     seen = _load_seen()
 
-    # 30분 이내 기사만 처리 (오래된 피드 항목 제외)
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
-
     seen_titles: set[str] = set()  # 이번 실행 내 제목 중복 제거용
 
     new_articles: list[dict] = []
@@ -80,7 +77,7 @@ def run_news_alert():
             if article['id'] in seen:
                 continue
             seen.add(article['id'])
-            if not is_first_run and article['pub'] >= cutoff:
+            if not is_first_run:
                 if '[속보]' not in article['title']:
                     continue
                 norm = article['title'].replace('[속보]', '').strip()
