@@ -78,21 +78,35 @@ def _get_today_news() -> list[str]:
     return list(dict.fromkeys(titles))  # 중복 제거
 
 
-def _get_investor_data(ticker: str, today: str) -> dict:
+def _get_investor_data(ticker: str, today: str, close: int = 0) -> dict:
     try:
-        from pykrx import stock as pkrx
-        df = pkrx.get_market_net_purchases_of_equities_by_ticker(today, today, market='KOSPI')
-        if df.empty or ticker not in df.index:
-            return {}
-        row = df.loc[ticker]
-        cols = row.index.tolist()
-        foreign = int(row.iloc[cols.index('외국인합계')] / 1e8) if '외국인합계' in cols else None
-        inst    = int(row.iloc[cols.index('기관합계')]   / 1e8) if '기관합계'   in cols else None
-        retail  = int(row.iloc[cols.index('개인')]       / 1e8) if '개인'       in cols else None
-        return {'foreign': foreign, 'institution': inst, 'retail': retail}
+        from bs4 import BeautifulSoup
+        today_fmt = f"{today[:4]}.{today[4:6]}.{today[6:]}"
+        url = f'https://finance.naver.com/item/investor.naver?code={ticker}'
+        r = requests.get(url, headers=_HEADERS, timeout=10)
+        soup = BeautifulSoup(r.text, 'lxml')
+
+        for row in soup.select('table.type2 tr'):
+            cols = row.select('td')
+            if len(cols) < 10 or cols[0].get_text(strip=True) != today_fmt:
+                continue
+
+            def to_ukwon(text):
+                t = text.replace(',', '').replace('+', '').strip()
+                try:
+                    shares = int(t)
+                    return int(shares * close / 1e8) if close else shares
+                except Exception:
+                    return None
+
+            return {
+                'foreign':     to_ukwon(cols[3].get_text(strip=True)),
+                'institution': to_ukwon(cols[6].get_text(strip=True)),
+                'retail':      to_ukwon(cols[9].get_text(strip=True)),
+            }
     except Exception as e:
         print(f"[investor] {e}")
-        return {}
+    return {}
 
 
 # ── Claude로 종목 선정 ───────────────────────────────────────
@@ -295,7 +309,7 @@ def run_study_sheet():
     print(f"      → {stock['name']} ({stock['pct']:+.2f}%)")
 
     print("[4/4] 수급 데이터 수집 중...")
-    investor = _get_investor_data(stock['ticker'], today)
+    investor = _get_investor_data(stock['ticker'], today, stock.get('close', 0))
 
     date_str = datetime.now(KST).strftime('%Y-%m-%d')
     title  = f"📚 {date_str} — {stock['name']}"
