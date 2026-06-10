@@ -16,11 +16,10 @@ jobs:
           python-version: '3.11'
 
       - name: 패키지 설치
-        run: pip install pykrx requests anthropic python-dotenv
+        run: pip install pykrx requests anthropic python-dotenv beautifulsoup4 lxml
 
-      - name: 학습지 발송
+      - name: 학습지 노션 저장
         run: python -c "from modules.study_sheet import run_study_sheet; run_study_sheet()"
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
