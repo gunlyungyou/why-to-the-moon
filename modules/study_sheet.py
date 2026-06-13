@@ -78,32 +78,31 @@ def _get_today_news() -> list[str]:
     return list(dict.fromkeys(titles))  # 중복 제거
 
 
-def _get_investor_data(ticker: str, today: str, close: int = 0) -> dict:
+def _get_investor_data(ticker: str, today: str) -> dict:
     try:
         from bs4 import BeautifulSoup
         today_fmt = f"{today[:4]}.{today[4:6]}.{today[6:]}"
-        url = f'https://finance.naver.com/item/investor.naver?code={ticker}'
+        url = f'https://finance.naver.com/item/frgn.naver?code={ticker}'
         r = requests.get(url, headers=_HEADERS, timeout=10)
+        r.encoding = 'euc-kr'
         soup = BeautifulSoup(r.text, 'lxml')
 
-        for row in soup.select('table.type2 tr'):
-            cols = row.select('td')
-            if len(cols) < 10 or cols[0].get_text(strip=True) != today_fmt:
-                continue
+        def parse(text):
+            t = text.replace(',', '').replace('+', '').strip()
+            try:
+                return int(t)
+            except Exception:
+                return None
 
-            def to_ukwon(text):
-                t = text.replace(',', '').replace('+', '').strip()
-                try:
-                    shares = int(t)
-                    return int(shares * close / 1e8) if close else shares
-                except Exception:
-                    return None
-
-            return {
-                'foreign':     to_ukwon(cols[3].get_text(strip=True)),
-                'institution': to_ukwon(cols[6].get_text(strip=True)),
-                'retail':      to_ukwon(cols[9].get_text(strip=True)),
-            }
+        for table in soup.find_all('table', class_='type2'):
+            for row in table.select('tr'):
+                cols = row.select('td')
+                if len(cols) < 7 or cols[0].get_text(strip=True) != today_fmt:
+                    continue
+                institution = parse(cols[5].get_text(strip=True))
+                foreign     = parse(cols[6].get_text(strip=True))
+                retail = -(institution + foreign) if (institution is not None and foreign is not None) else None
+                return {'institution': institution, 'foreign': foreign, 'retail': retail}
     except Exception as e:
         print(f"[investor] {e}")
     return {}
@@ -206,7 +205,7 @@ def _build_notion_blocks(stock: dict, investor: dict) -> list[dict]:
         if val is None:
             return f"{label}: 직접 확인"
         sign = '순매수 🟢' if val > 0 else '순매도 🔴'
-        return f"{label}: {sign} ({val:+,}억원)"
+        return f"{label}: {sign} ({val:+,}주)"
 
     blocks = [
         _divider(),
@@ -309,7 +308,7 @@ def run_study_sheet():
     print(f"      → {stock['name']} ({stock['pct']:+.2f}%)")
 
     print("[4/4] 수급 데이터 수집 중...")
-    investor = _get_investor_data(stock['ticker'], today, stock.get('close', 0))
+    investor = _get_investor_data(stock['ticker'], today)
 
     date_str = datetime.now(KST).strftime('%Y-%m-%d')
     title  = f"📚 {date_str} — {stock['name']}"
