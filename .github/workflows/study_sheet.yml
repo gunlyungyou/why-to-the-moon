@@ -1,8 +1,6 @@
 name: 오늘의 주식 학습지
 
 on:
-  schedule:
-    - cron: '0 7 * * 1-5'  # 평일 16:00 KST (UTC 07:00)
   workflow_dispatch:
 
 jobs:
